@@ -1,0 +1,112 @@
+---
+variant: fcos
+version: 1.6.0
+
+metadata:
+  name: "k8s-master"
+
+storage:
+  files:
+    - path: /etc/NetworkManager/system-connections/ens160.nmconnection
+      mode: 0600
+      contents:
+        inline: |
+          [connection]
+          id=ens160
+          type=ethernet
+          interface-name=ens160
+          [ipv4]
+          method=manual
+          address1=192.168.222.10/24,192.168.222.2
+          dns=8.8.8.8;1.1.1.1;
+          gateway=192.168.222.2
+          [ipv6]
+          method=ignore
+
+    # kube
+    - path: /usr/local/bin/kubeadm
+      mode: 0755
+      contents:
+        source: https://dl.k8s.io/release/v1.32.0/bin/linux/arm64/kubeadm
+
+    - path: /usr/local/bin/kubectl
+      mode: 0755
+      contents:
+        source: https://dl.k8s.io/release/v1.32.0/bin/linux/arm64/kubectl
+        
+    - path: /usr/local/bin/kubelet
+      mode: 0755
+      contents:
+        source: https://dl.k8s.io/release/v1.32.0/bin/linux/arm64/kubelet
+
+    - path: /etc/containerd/config.toml
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          version = 2
+          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+            runtime_type = "io.containerd.runc.v2"
+            
+    - path: /etc/modules-load.d/br_netfilter.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: br_netfilter
+
+    - path: /etc/sysctl.d/kubernetes.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          net.bridge.bridge-nf-call-iptables=1
+          net.ipv4.ip_forward=1
+
+systemd:
+  units:
+    - name: NetworkManager.service
+      enabled: true
+
+    # kubelet 서비스 설정
+    - name: kubelet.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=kubelet: The Kubernetes Node Agent
+        Documentation=https://kubernetes.io/docs/home/
+        After=containerd.service
+        Requires=containerd.service
+
+        [Service]
+        User=root
+        ExecStart=/usr/local/bin/kubelet
+        Restart=always
+        StartLimitInterval=0
+        RestartSec=10
+
+        [Install]
+        WantedBy=multi-user.target
+
+    # containerd 서비스 설정
+    - name: containerd.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=containerd container runtime
+        Documentation=https://containerd.io
+        After=network-online.target NetworkManager-wait-online.service
+
+        [Service]
+        User=root
+        ExecStart=/usr/bin/containerd
+        Restart=always
+        RestartSec=5
+
+        [Install]
+        WantedBy=multi-user.target
+passwd:
+  users:
+    - name: core
+      uid: 1000
+      ssh_authorized_keys:
+        - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDa2mtbhJ9sx7GoiWbfwoL24/cdo3aDCad9rkjm4l4vCvCIfQI7w0Wqheu6iq1FvkjLkhnG9UWuBLjle1zEWYTRxy9NIrnNn1SInZJZxEcM3TnrwaK42mRQDhzSOLmslt8sKBbpkwYF3XTSOg45CBHYoAcUqCylHXPj+WTryGKFVFnxPeSwrpd32x4/wd6kjvq79MDl4gOkY1VMOVogaDan/hNkK6BxGoMWfbRQPO6tzpnfGAmFzUllPuNAFFif09pVki8TO+ogjddyKQyPkn+XUFhWf3Z1vbWEgxnAakqRRHmnD6bVBCJxc7tE5gOfSloO0q8Zl1B3JeD/4JHy6uxBNLdBmVDsxXavcrg1cNcHQdNN9R3h2+SpVwGBzbADQbzQD60IaqL12HNYaCYpZ3DxU3oOQWT9i0JnJLDdojn9tiGH6gmi5qGxvCjmT2CAIKNQ/WSH7Kojw8XBTA5HNMtuBWdKvn6Ytp3mlpFm4KBcQqju0SpOP7xbyLWISog81Z2HTI/ty2VB/NCY305VK9kMZRKve4uMSAI960nI4nn/SpiZkAIQFC1UxbtoOv7wCCiqBZn59gHvGnu38Z9+iV9oxyLyNTxo+Ze4NQ08XrWFFBWlLPZy0izg5LrmkA1JFns4MYi+bgLeXaKIBk+5ojuxx81k3oVcQ2aaWgc6vKOK5Q== core_user

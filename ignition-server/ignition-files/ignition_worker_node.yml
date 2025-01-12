@@ -1,0 +1,111 @@
+---
+variant: fcos
+version: 1.6.0
+
+metadata:
+  name: "k8s-worker"
+
+storage:
+  files:
+    - path: /etc/NetworkManager/system-connections/ens160.nmconnection
+      mode: 0600
+      contents:
+        inline: |
+          [connection]
+          id=ens160
+          type=ethernet
+          interface-name=ens160
+          [ipv4]
+          method=dhcp
+          dns=8.8.8.8;1.1.1.1;
+          [ipv6]
+          method=ignore
+        
+    # 워커 노드 초기화 스크립트
+    - path: /etc/kubernetes/kubeadm-join.sh
+      mode: 0700
+      user:
+        id: 1000
+      group:
+        id: 1000
+      contents:
+        inline: |
+          #!/usr/bin/env bash
+          set -e
+
+          # 컨테이너 런타임 설정 (containerd)
+          cat <<EOF > /etc/containerd/config.toml
+          version = 2
+          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+            runtime_type = "io.containerd.runc.v2"
+          EOF
+
+          systemctl restart containerd
+
+          # Kubernetes 클러스터에 조인
+          kubeadm join 192.168.222.2:6443 --token <TOKEN> --discovery-token-ca-cert-hash sha256:<HASH>
+
+systemd:
+  units:
+    - name: NetworkManager.service
+      enabled: true
+
+    # kubeadm join 서비스
+    - name: kubeadm-join.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Join Kubernetes cluster using kubeadm
+        After=network-online.target NetworkManager-wait-online.service
+        Wants=network-online.target NetworkManager-wait-online.service
+
+        [Service]
+        Type=oneshot
+        ExecStart=/etc/kubernetes/kubeadm-join.sh
+        RemainAfterExit=yes
+
+        [Install]
+        WantedBy=multi-user.target
+
+    # kubelet 서비스 설정
+    - name: kubelet.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=kubelet: The Kubernetes Node Agent
+        Documentation=https://kubernetes.io/docs/home/
+        After=containerd.service
+        Requires=containerd.service
+
+        [Service]
+        ExecStart=/usr/local/bin/kubelet
+        Restart=always
+        StartLimitInterval=0
+        RestartSec=10
+
+        [Install]
+        WantedBy=multi-user.target
+
+    # containerd 서비스 설정
+    - name: containerd.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=containerd container runtime
+        Documentation=https://containerd.io
+        After=network-online.target NetworkManager-wait-online.service
+
+        [Service]
+        ExecStart=/usr/local/bin/containerd
+        Restart=always
+        RestartSec=5
+
+        [Install]
+        WantedBy=multi-user.target
+
+passwd:
+  users:
+    - name: core
+      uid: 1000
+      ssh_authorized_keys:
+        - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDa2mtbhJ9sx7GoiWbfwoL24/cdo3aDCad9rkjm4l4vCvCIfQI7w0Wqheu6iq1FvkjLkhnG9UWuBLjle1zEWYTRxy9NIrnNn1SInZJZxEcM3TnrwaK42mRQDhzSOLmslt8sKBbpkwYF3XTSOg45CBHYoAcUqCylHXPj+WTryGKFVFnxPeSwrpd32x4/wd6kjvq79MDl4gOkY1VMOVogaDan/hNkK6BxGoMWfbRQPO6tzpnfGAmFzUllPuNAFFif09pVki8TO+ogjddyKQyPkn+XUFhWf3Z1vbWEgxnAakqRRHmnD6bVBCJxc7tE5gOfSloO0q8Zl1B3JeD/4JHy6uxBNLdBmVDsxXavcrg1cNcHQdNN9R3h2+SpVwGBzbADQbzQD60IaqL12HNYaCYpZ3DxU3oOQWT9i0JnJLDdojn9tiGH6gmi5qGxvCjmT2CAIKNQ/WSH7Kojw8XBTA5HNMtuBWdKvn6Ytp3mlpFm4KBcQqju0SpOP7xbyLWISog81Z2HTI/ty2VB/NCY305VK9kMZRKve4uMSAI960nI4nn/SpiZkAIQFC1UxbtoOv7wCCiqBZn59gHvGnu38Z9+iV9oxyLyNTxo+Ze4NQ08XrWFFBWlLPZy0izg5LrmkA1JFns4MYi+bgLeXaKIBk+5ojuxx81k3oVcQ2aaWgc6vKOK5Q== core_user
