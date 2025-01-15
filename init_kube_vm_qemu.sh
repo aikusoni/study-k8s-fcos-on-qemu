@@ -75,16 +75,21 @@ vm_dir="./machines/$vm_name"
 mkdir -p "$vm_dir"
 
 new_image="$vm_dir/fcos-vm.qcow2"
+qemu_base="/opt/homebrew/Cellar/qemu"
+qemu_version=$(ls "$qemu_base" | sort -V | tail -n 1)
 
 echo "원본 qcow2 이미지: $qcow2_image"
 echo "Ignition 파일: $ignition_path"
 echo "새로운 VM 디렉토리: $vm_dir"
 echo "새로운 VM 이미지: $new_image"
+echo "QEMU 버전: $qemu_version" 
 
 # qcow2 이미지를 복사해서 새로운 VM 디렉토리로 이동
 qemu-img create -f qcow2 -F qcow2 -b "$(realpath $qcow2_image)" "$new_image"
 
 echo "새로운 VM 이미지 생성 완료: $new_image"
+
+/bin/dd if=/dev/zero conv=sync bs=1m count=64 of=$vm_dir/pflash.img
 
 # QEMU 실행
 echo "QEMU 실행 중..."
@@ -94,11 +99,13 @@ qemu-system-aarch64 \
     -m $memory_size \
     -accel hvf \
     -accel tcg \
-    -device virtio-net,netdev=hostnet0,mac=12:17:c4:e7:d3:58 \
+    -device virtio-net,netdev=usernet,mac=12:34:56:78:90:ab \
+    -device virtio-serial \
+    -drive file=/opt/homebrew/Cellar/qemu/$qemu_version/share/qemu/edk2-aarch64-code.fd,if=pflash,format=raw,readonly=on \
+    -drive file=$vm_dir/pflash.img,if=pflash,format=raw \
     -drive "if=virtio,file=$(realpath $new_image)" \
     -fw_cfg name=opt/com.coreos/config,file=$(realpath $ignition_path) \
     -machine virt,highmem=on \
     -monitor stdio \
     -serial none \
-    -netdev "user,id=hostnet0,hostfwd=tcp:127.0.0.1:$ssh_port-:22" \
-    -nographic 
+    -netdev "user,id=usernet,hostfwd=tcp:127.0.0.1:$ssh_port-0.0.0.0:22"
