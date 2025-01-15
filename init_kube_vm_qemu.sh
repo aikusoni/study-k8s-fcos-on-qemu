@@ -2,8 +2,6 @@
 
 # 필요한 도구 확인
 command -v qemu-img >/dev/null 2>&1 || { echo >&2 "qemu-img가 필요합니다. 설치 후 다시 시도하세요."; exit 1; }
-command -v vmrun >/dev/null 2>&1 || { echo >&2 "vmrun이 필요합니다. VMware Fusion이 설치되어 있어야 합니다."; exit 1; }
-# command -v ovftool >/dev/null 2>&1 || { echo >&2 "ovftool이 필요합니다. VMware Fusion이 설치되어 있어야 합니다."; exit 1; }
 
 image_dir="./images"
 temp_dir="./temp"
@@ -99,7 +97,6 @@ qemu-system-aarch64 \
     -m $memory_size \
     -accel hvf \
     -accel tcg \
-    -device virtio-net,netdev=usernet,mac=12:34:56:78:90:ab \
     -device virtio-serial \
     -drive file=/opt/homebrew/Cellar/qemu/$qemu_version/share/qemu/edk2-aarch64-code.fd,if=pflash,format=raw,readonly=on \
     -drive file=$vm_dir/pflash.img,if=pflash,format=raw \
@@ -108,4 +105,4 @@ qemu-system-aarch64 \
     -machine virt,highmem=on \
     -monitor stdio \
     -serial none \
-    -netdev "user,id=usernet,hostfwd=tcp:127.0.0.1:$ssh_port-0.0.0.0:22"
+    -netdev vmnet-shared,id=kubenet -device virtio-net,netdev=kubenet 
