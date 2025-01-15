@@ -3,7 +3,7 @@
 # 필요한 도구 확인
 command -v qemu-img >/dev/null 2>&1 || { echo >&2 "qemu-img가 필요합니다. 설치 후 다시 시도하세요."; exit 1; }
 command -v vmrun >/dev/null 2>&1 || { echo >&2 "vmrun이 필요합니다. VMware Fusion이 설치되어 있어야 합니다."; exit 1; }
-command -v ovftool >/dev/null 2>&1 || { echo >&2 "ovftool이 필요합니다. VMware Fusion이 설치되어 있어야 합니다."; exit 1; }
+# command -v ovftool >/dev/null 2>&1 || { echo >&2 "ovftool이 필요합니다. VMware Fusion이 설치되어 있어야 합니다."; exit 1; }
 
 image_dir="./images"
 temp_dir="./temp"
@@ -62,20 +62,30 @@ else
     echo "파일 다운로드 실패! ./ignition-server/ignition.sh를 실행해서 서버를 켜세요."
 fi
 
-ignition_encoding="base64"
-ignition_encoded=$(base64 -i "$ignition_path" | tr -d '\n')
-
 # 디렉토리 설정
 vm_dir="./machines/$vm_name"
 mkdir -p "$vm_dir"
 
 # 파일 경로 설정
-original_vmx_path="$temp_dir/$vm_name/original.vmx"
+# original_vmx_path="$temp_dir/$vm_name/original.vmx"
 vmx_path="${vm_dir}/${vm_name}.vmx"
-vmdk_path="$temp_dir/$vm_name/${vm_name}.vmdk"
-ovf_path="$temp_dir/$vm_name/${vm_name}.ovf"
-mf_path="$temp_dir/${vm_name}.mf"
-ova_path="${vm_dir}/${vm_name}.ova"
+vmdk_path="${vm_dir}/${vm_name}.vmdk"
+# ovf_path="$temp_dir/$vm_name/${vm_name}.ovf"
+# mf_path="$temp_dir/${vm_name}.mf"
+# ova_path="${vm_dir}/${vm_name}.ova"
+iso_path="${vm_dir}/ignition.iso"
+
+ignition_encoding="base64"
+ignition_encoded=$(base64 -i "$ignition_path" | tr -d '\n')
+
+config_dir="$temp_dir/$vm_name/config"
+mkdir -p "$config_dir"
+
+cp "$ignition_path" "$config_dir/config.ign"
+
+cat "$config_dir/config.ign"
+
+hdiutil makehybrid -o "${iso_path}" "$config_dir" -iso -joliet -default-volume-name config-2 -iso-volume-name config-2 -udf-volume-name config-2
 
 # qcow2 이미지를 VMDK로 변환
 echo "Converting qcow2 image to VMDK..."
@@ -85,7 +95,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-cat <<EOF > "$original_vmx_path"
+cat <<EOF > "$vmx_path"
 .encoding = "UTF-8"
 config.version = "8"
 virtualHW.version = "21"
@@ -130,34 +140,30 @@ floppy0.present = "FALSE"
 monitor.phys_bits_used = "36"
 cleanShutdown = "TRUE"
 softPowerOff = "FALSE"
-usb_xhci:4.parent = "-1"
-usb_xhci:4.port = "4"
-usb_xhci:4.deviceType = "video"
-keyboard.layout = "us"
-keyboard.typematicMinDelay = "2000000"
-keyboard.typematicRate = "50"
-keyboard.numLock = "TRUE"
-usb:0.present = "TRUE"
-usb:0.deviceType = "hid"
-usb:0.port = "1"
-usb:0.parent = "-1"
+sata0.present = "TRUE"
+sata0:1.present = "TRUE"
+sata0:1.deviceType = "cdrom-image"
+sata0:1.fileName = "$(realpath $iso_path)"
+sata0:1.startConnected = "TRUE"
+sata0:1.allowGuestConnectionControl = "TRUE"
+sata0:1.pciSlotNumber = "35"
 EOF
 
 # VMDK TO OVA 변환
-echo "Converting VMDK to OVA..."
-ovftool "$original_vmx_path" "$ova_path"
+# echo "Converting VMDK to OVA..."
+# ovftool "$original_vmx_path" "$ova_path"
 
-echo "Injecting Ignition URL into OVA..."
-ovftool \
-    --powerOffTarget \
-    --name="${vm_name}" \
-    --allowExtraConfig \
-    --extraConfig:guestinfo.ignition.config.data.encoding="${ignition_encoding}" \
-    --extraConfig:guestinfo.ignition.config.data="${ignition_encoded}" \
-    "$ova_path" \
-    "$vmx_path"
+# echo "Injecting Ignition URL into OVA..."
+# ovftool \
+#     --powerOffTarget \
+#     --name="${vm_name}" \
+#     --allowExtraConfig \
+#     --extraConfig:guestinfo.ignition.config.data.encoding="${ignition_encoding}" \
+#     --extraConfig:guestinfo.ignition.config.data="${ignition_encoded}" \
+#     "$ova_path" \
+#     "$vmx_path"
 
-sed -i '' 's/^guestOS = ".*"/guestOS = "arm-fedora-64"/I' "$vmx_path"
+# sed -i '' 's/^guestOS = ".*"/guestOS = "arm-fedora-64"/I' "$vmx_path"
 
 # 가상 머신 시작
 echo "Starting VM using vmrun..."
