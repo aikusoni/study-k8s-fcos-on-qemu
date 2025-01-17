@@ -37,13 +37,13 @@ select vm_mode in "kube_main" "kube_worker"; do
   case "$vm_mode" in
     kube_main)
       ignition_url="http://localhost:8000/ignition_main.json"
-      memory_size="2048"
+      memory_size="4096"
       num_cpus="4"
       break
       ;;
     kube_worker)
       ignition_url="http://localhost:8000/ignition_worker.json"
-      memory_size="1024"
+      memory_size="2048"
       num_cpus="2"
       break
       ;;
@@ -67,7 +67,7 @@ fi
 
 # QEMU SSH 포트 포워딩 정보 입력
 read -p "Input your QEMU SSH port forwarding (host:guest): " ssh_port
-
+µ
 # 디렉토리 설정
 vm_dir="./machines/$vm_name"
 mkdir -p "$vm_dir"
@@ -105,4 +105,5 @@ qemu-system-aarch64 \
     -machine virt,highmem=on \
     -monitor stdio \
     -serial none \
-    -netdev vmnet-shared,id=kubenet -device virtio-net,netdev=kubenet 
+    -netdev vmnet-shared,id=kubenet -device virtio-net,netdev=kubenet \
+    -name "$vm_name"
