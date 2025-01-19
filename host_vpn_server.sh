@@ -61,7 +61,8 @@ else
   ########################################
   vpn_network_name="${vpn_name}-network"
 
-  read -rp "VPN에서 사용할 IP 범위(CIDR)를 입력하세요 (예: 10.117.0.0/16): " ip_cidr
+  read -rp "VPN에서 사용할 IP 범위(CIDR)를 입력하세요. (예: 10.117.0.0/16): " ip_cidr
+
   ip_base="${ip_cidr%%/*}"
   ip_subnet="${ip_base%.*}"
   gateway_ip="${ip_subnet}.1"
@@ -82,8 +83,8 @@ else
   echo "Client Public Key: $client_pub"
   
   config_dir=~/podman-shared/wireguard-config/${vpn_name}
-  mkdir -p "$config_dir"
-  cat <<EOF > "${config_dir}/wg0.conf"
+  mkdir -p "$config_dir/wg_confs"
+  cat <<EOF > "${config_dir}/wg_confs/wg0.conf"
 [Interface]
 Address = $vpn_server_ip/$cidr
 ListenPort = 51820
@@ -94,23 +95,60 @@ PublicKey = $client_pub
 AllowedIPs = $ip_cidr
 EOF
 
-  podman network create --subnet "${ip_cidr}" --gateway "${gateway_ip}" "${vpn_network_name}"
+  # podman network create --subnet "${ip_cidr}" --gateway "${gateway_ip}" "${vpn_network_name}"
 
   # WireGuard VPN 컨테이너 생성
   echo "WireGuard VPN 컨테이너를 생성 중입니다..."
   podman run -d \
     --name "${vpn_name}" \
-    --network "${vpn_network_name}" \
-    --ip "$vpn_server_ip" \
     --cap-add=NET_ADMIN \
-    -p 51820:51820/udp \
+    -p=51820:51820/udp \
+    -p=51821:51821/tcp \
     -v "$config_dir:/config" \
     -e PUID=1000 \
     -e PGID=1000 \
-    -e SERVERURL=0.0.0.0 \
     -e SERVERPORT=51820 \
     -e INTERNAL_SUBNET="${ip_cidr}" \
+    -e ALLOWEDIPS=0.0.0.0/0 \
     docker.io/linuxserver/wireguard:latest
 
   echo "'${vpn_name}' 컨테이너가 생성되었습니다. 로그나 설정 디렉토리를 확인해 주세요."
+
+  container_ip=$(podman inspect wireguard | jq -r ".[0].NetworkSettings.IPAddress")
+  echo "WireGuard 컨테이너 IP: ${container_ip}"
+
+  client_config_dir=./wireguard-client-config/${vpn_name}
+  client_config_file=${client_config_dir}/wg0.conf
+  mkdir -p "$client_config_dir"
+  cat <<EOF > "${client_config_file}"
+[Interface]
+PrivateKey = $client_priv
+Address = ${ip_subnet}.2/${cidr}
+
+[Peer]
+PublicKey = $server_pub
+Endpoint = localhost:51820
+AllowedIPs = $ip_cidr
+PersistentKeepalive = 25
+EOF
+
+  echo "VPN 연결 테스트를 시작합니다..."
+  sudo wg-quick up "${client_config_file}"
+  echo "VPN 인터페이스가 활성화되었습니다. 연결 테스트를 진행합니다..."
+  
+  # 잠시 대기하여 인터페이스 설정이 완료되도록 함
+  sleep 5
+
+  # VPN을 통해 서버에 ping 테스트 시도
+  if ping -c 4 "${vpn_server_ip}" &>/dev/null; then
+    echo "VPN 연결 성공: 서버(${vpn_server_ip})에 ping 응답이 있습니다."
+  else
+    echo "VPN 연결 실패: 서버(${vpn_server_ip})에 ping 응답이 없습니다."
+  fi
+
+  # VPN 인터페이스 비활성화
+  sudo wg-quick down "${client_config_file}"
+
+  echo "VPN 연결 테스트가 완료되었습니다."
+
 fi
