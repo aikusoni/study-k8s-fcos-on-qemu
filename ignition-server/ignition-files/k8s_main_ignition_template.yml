@@ -24,16 +24,7 @@ storage:
     - path: /etc/wireguard/wg0.conf
       mode: 0600
       contents:
-        inline: |
-          [Interface]
-          Address = ${var.wg0_address}
-          PrivateKey = 
-          ListenPort = 51820
-
-          [Peer]
-          PublicKey = 
-          PresharedKey = 
-          AllowedIPs = 192.168.71.0/24,fdc9:3c6b:21c7:e6bd::/64
+        source: data:text/plain;charset=utf-8;base64,$ENCODED_WG0_CONF_CONTENT
 
     # kube
     - path: /usr/local/bin/kubeadm
@@ -77,6 +68,9 @@ storage:
 systemd:
   units:
     - name: NetworkManager.service
+      enabled: true
+      
+    - name: wg-quick@wg0.service
       enabled: true
 
     # kubelet 서비스 설정
