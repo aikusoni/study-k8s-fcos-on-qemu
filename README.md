@@ -1,10 +1,14 @@
 # Run k8s cluster on local machine
 
 ## Overview
-This project is to run k8s cluster on macbook pro (m3).
-The k8s cluster is running on fedora core os that is running on qemu.
-This is my study project to run k8s cluster on my local machine.
-The k8s nodes are communicating with each other through wireguard vpn.
+- This is my study project to run k8s cluster on my local machine.
+
+## Specifications
+- This project is to run k8s cluster on macbook pro (m3).
+
+- The k8s cluster is running on fedora core os that is running on qemu.
+
+- The k8s nodes are communicating with each other through wireguard vpn.
 
 ## Running Sequence
 ```sh
