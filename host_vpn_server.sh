@@ -36,55 +36,51 @@ if ! podman machine list --format '{{.Name}}:{{.Running}}' \
   podman machine start "${machine_name}"
 fi
 
-########################################
-# 3) VPN 이름 입력받기
-########################################
-read -rp "생성/시작할 VPN(컨테이너) 이름을 입력하세요: " vpn_name
+# VPN 이름
+vpn_name="wireguard-vpn"
 
-########################################
-# 4) 해당 이름의 컨테이너 존재 여부 확인
-########################################
+# VPN 컨테이너 존재 확인
 if podman container inspect "${vpn_name}" &>/dev/null; then
-  ########################################
-  # 5) 이미 존재하면 해당 컨테이너 시작
-  ########################################
-  echo "이미 '${vpn_name}' 컨테이너가 존재합니다. 컨테이너를 시작합니다..."
+  echo "이미 '${vpn_name}' 컨테이너가 존재합니다."
+
+  # 이미 컨테이너가 실행 중이면 종료
+  if podman container inspect "${vpn_name}" --format '{{.State.Status}}' | grep -q "running"; then
+    echo "'${vpn_name}' 컨테이너가 이미 실행 중입니다. 종료합니다."
+    exit 0
+  fi
+
+  echo "'${vpn_name}' 컨테이너가 종료되어 있습니다. 시작합니다."
   podman start "${vpn_name}"
-else
-  ########################################
-  # 6) 존재하지 않으면 초기화 절차 시작
-  ########################################
-  echo "'${vpn_name}' 컨테이너가 존재하지 않습니다. 새로 생성합니다."
+  exit 0
+fi
 
-  ########################################
-  # 7) IP 범위(CIDR) 설정값 입력받기
-  ########################################
-  vpn_network_name="${vpn_name}-network"
+# 컨테이너가 존재하지 않으면 생성
+echo "'${vpn_name}' 컨테이너가 존재하지 않습니다. 새로 생성합니다."
 
-  read -rp "VPN에서 사용할 IP 범위(CIDR)를 입력하세요. (예: 10.117.0.0/16): " ip_cidr
+read -rp "VPN에서 사용할 IP 범위(CIDR)를 입력하세요. (예: 10.117.0.0/16): " ip_cidr
 
-  ip_base="${ip_cidr%%/*}"
-  ip_subnet="${ip_base%.*}"
-  gateway_ip="${ip_subnet}.1"
-  vpn_server_ip="${ip_subnet}.128"
-  cidr="${ip_cidr##*/}"
+ip_base="${ip_cidr%%/*}"
+ip_subnet="${ip_base%.*}"
+gateway_ip="${ip_subnet}.1"
+vpn_server_ip="${ip_subnet}.128"
+cidr="${ip_cidr##*/}"
 
-  # 서버 키 생성
-  server_priv=$(wg genkey)
-  server_pub=$(echo "$server_priv" | wg pubkey)
+# 서버 키 생성
+server_priv=$(wg genkey)
+server_pub=$(echo "$server_priv" | wg pubkey)
 
-  # 클라이언트 키 생성
-  client_priv=$(wg genkey)
-  client_pub=$(echo "$client_priv" | wg pubkey)
+# 클라이언트 키 생성
+client_priv=$(wg genkey)
+client_pub=$(echo "$client_priv" | wg pubkey)
 
-  echo "Server Private Key: $server_priv"
-  echo "Server Public Key: $server_pub"
-  echo "Client Private Key: $client_priv"
-  echo "Client Public Key: $client_pub"
-  
-  config_dir=~/podman-shared/wireguard-config/${vpn_name}
-  mkdir -p "$config_dir/wg_confs"
-  cat <<EOF > "${config_dir}/wg_confs/wg0.conf"
+echo "Server Private Key: $server_priv"
+echo "Server Public Key: $server_pub"
+echo "Client Private Key: $client_priv"
+echo "Client Public Key: $client_pub"
+
+config_dir=~/podman-shared/wireguard-config/${vpn_name}
+mkdir -p "$config_dir/wg_confs"
+cat <<EOF > "${config_dir}/wg_confs/wg0.conf"
 [Interface]
 Address = $vpn_server_ip/$cidr
 ListenPort = 51820
@@ -95,32 +91,30 @@ PublicKey = $client_pub
 AllowedIPs = $ip_cidr
 EOF
 
-  # podman network create --subnet "${ip_cidr}" --gateway "${gateway_ip}" "${vpn_network_name}"
+# WireGuard VPN 컨테이너 생성
+echo "WireGuard VPN 컨테이너를 생성 중입니다..."
+podman run -d \
+  --name "${vpn_name}" \
+  --cap-add=NET_ADMIN \
+  -p=51820:51820/udp \
+  -p=51821:51821/tcp \
+  -v "$config_dir:/config" \
+  -e PUID=1000 \
+  -e PGID=1000 \
+  -e SERVERPORT=51820 \
+  -e INTERNAL_SUBNET="${ip_cidr}" \
+  -e ALLOWEDIPS=0.0.0.0/0 \
+  docker.io/linuxserver/wireguard:latest
 
-  # WireGuard VPN 컨테이너 생성
-  echo "WireGuard VPN 컨테이너를 생성 중입니다..."
-  podman run -d \
-    --name "${vpn_name}" \
-    --cap-add=NET_ADMIN \
-    -p=51820:51820/udp \
-    -p=51821:51821/tcp \
-    -v "$config_dir:/config" \
-    -e PUID=1000 \
-    -e PGID=1000 \
-    -e SERVERPORT=51820 \
-    -e INTERNAL_SUBNET="${ip_cidr}" \
-    -e ALLOWEDIPS=0.0.0.0/0 \
-    docker.io/linuxserver/wireguard:latest
+echo "'${vpn_name}' 컨테이너가 생성되었습니다. 로그나 설정 디렉토리를 확인해 주세요."
 
-  echo "'${vpn_name}' 컨테이너가 생성되었습니다. 로그나 설정 디렉토리를 확인해 주세요."
+container_ip=$(podman inspect wireguard | jq -r ".[0].NetworkSettings.IPAddress")
+echo "WireGuard 컨테이너 IP: ${container_ip}"
 
-  container_ip=$(podman inspect wireguard | jq -r ".[0].NetworkSettings.IPAddress")
-  echo "WireGuard 컨테이너 IP: ${container_ip}"
-
-  client_config_dir=./wireguard-client-config/${vpn_name}
-  client_config_file=${client_config_dir}/wg0.conf
-  mkdir -p "$client_config_dir"
-  cat <<EOF > "${client_config_file}"
+client_config_dir=./wireguard-client-config/${vpn_name}
+client_config_file=${client_config_dir}/wg0.conf
+mkdir -p "$client_config_dir"
+cat <<EOF > "${client_config_file}"
 [Interface]
 PrivateKey = $client_priv
 Address = ${ip_subnet}.2/${cidr}
@@ -132,23 +126,31 @@ AllowedIPs = $ip_cidr
 PersistentKeepalive = 25
 EOF
 
-  echo "VPN 연결 테스트를 시작합니다..."
-  sudo wg-quick up "${client_config_file}"
-  echo "VPN 인터페이스가 활성화되었습니다. 연결 테스트를 진행합니다..."
-  
-  # 잠시 대기하여 인터페이스 설정이 완료되도록 함
-  sleep 5
+echo "VPN 연결 테스트를 시작합니다..."
+sudo wg-quick up "${client_config_file}"
+echo "VPN 인터페이스가 활성화되었습니다. 연결 테스트를 진행합니다..."
 
-  # VPN을 통해 서버에 ping 테스트 시도
-  if ping -c 4 "${vpn_server_ip}" &>/dev/null; then
-    echo "VPN 연결 성공: 서버(${vpn_server_ip})에 ping 응답이 있습니다."
-  else
-    echo "VPN 연결 실패: 서버(${vpn_server_ip})에 ping 응답이 없습니다."
-  fi
+# 잠시 대기하여 인터페이스 설정이 완료되도록 함
+sleep 5
 
-  # VPN 인터페이스 비활성화
-  sudo wg-quick down "${client_config_file}"
-
-  echo "VPN 연결 테스트가 완료되었습니다."
-
+# VPN을 통해 서버에 ping 테스트 시도
+if ping -c 4 "${vpn_server_ip}" &>/dev/null; then
+  echo "VPN 연결 성공: 서버(${vpn_server_ip})에 ping 응답이 있습니다."
+else
+  echo "VPN 연결 실패: 서버(${vpn_server_ip})에 ping 응답이 없습니다."
 fi
+
+# VPN 인터페이스 비활성화
+sudo wg-quick down "${client_config_file}"
+
+echo "VPN 연결 테스트가 완료되었습니다."
+
+# 키 저장
+echo "테스트를 위한 키를 저장 중입니다..."
+mkdir -p ./keys
+
+echo "$server_pub" > "./keys/${vpn_name}_server_pubkey"
+echo "$client_priv" > "./keys/${vpn_name}_client_privkey"
+
+echo "키 저장이 완료되었습니다."
+echo "경로: ./keys/${vpn_name}_server_pubkey, ./keys/${vpn_name}_client_privkey"

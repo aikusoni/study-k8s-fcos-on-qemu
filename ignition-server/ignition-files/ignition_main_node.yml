@@ -16,10 +16,8 @@ storage:
           type=ethernet
           interface-name=ens160
           [ipv4]
-          method=manual
-          address1=192.168.222.10/24,192.168.222.2
+          method=dhcp
           dns=8.8.8.8;1.1.1.1;
-          gateway=192.168.222.2
           [ipv6]
           method=ignore
 

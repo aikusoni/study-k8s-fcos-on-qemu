@@ -90,8 +90,11 @@ echo "새로운 VM 이미지 생성 완료: $new_image"
 /bin/dd if=/dev/zero conv=sync bs=1m count=64 of=$vm_dir/pflash.img
 
 # QEMU 실행
+echo "QEMU 실행시 vmnet-shared 네트워크를 사용하기 때문에 sudo 권한이 필요합니다."
+sudo -v
+
 echo "QEMU 실행 중..."
-qemu-system-aarch64 \
+nohup sudo qemu-system-aarch64 \
     -cpu host \
     -smp $num_cpus \
     -m $memory_size \
@@ -103,7 +106,9 @@ qemu-system-aarch64 \
     -drive "if=virtio,file=$(realpath $new_image)" \
     -fw_cfg name=opt/com.coreos/config,file=$(realpath $ignition_path) \
     -machine virt,highmem=on \
-    -monitor stdio \
-    -serial none \
+    -vga std \
+    -serial vc \
+    -monitor none \
+    -parallel none \
     -netdev vmnet-shared,id=kubenet -device virtio-net,netdev=kubenet \
-    -name "$vm_name"
+    -name "$vm_name" > /dev/null 2> ./temp/vmerror.out &
