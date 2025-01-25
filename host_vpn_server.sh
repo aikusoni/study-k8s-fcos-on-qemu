@@ -1,4 +1,9 @@
 #!/bin/bash
+
+# This script initializes wireguard vpn server on host machine via podman.
+# The script will generate wireguard vpn server configuration file.
+# The script will generate vpn client configuration files. (./wireguard-client-config/*/wg0.conf)
+
 set -euo pipefail
 
 if ! command -v podman &>/dev/null; then

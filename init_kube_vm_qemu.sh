@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# This script initializes a new virtual machine with Fedora CoreOS using QEMU.
+# The script will download the ignition template file from the server (./ignition-server/ignition.sh).
+
 # 필요한 도구 확인
 command -v qemu-img >/dev/null 2>&1 || { echo >&2 "qemu-img is required. Please install qemu-img and try again."; exit 1; }
 
