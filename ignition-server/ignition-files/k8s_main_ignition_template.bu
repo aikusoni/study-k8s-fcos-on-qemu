@@ -21,6 +21,20 @@ storage:
           [ipv6]
           method=ignore
 
+    - path: /etc/wireguard/wg0.conf
+      mode: 0600
+      contents:
+        inline: |
+          [Interface]
+          Address = ${var.wg0_address}
+          PrivateKey = 
+          ListenPort = 51820
+
+          [Peer]
+          PublicKey = 
+          PresharedKey = 
+          AllowedIPs = 192.168.71.0/24,fdc9:3c6b:21c7:e6bd::/64
+
     # kube
     - path: /usr/local/bin/kubeadm
       mode: 0755

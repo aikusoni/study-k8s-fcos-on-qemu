@@ -3,6 +3,8 @@
 # 필요한 도구 확인
 command -v qemu-img >/dev/null 2>&1 || { echo >&2 "qemu-img가 필요합니다. 설치 후 다시 시도하세요."; exit 1; }
 
+source ./preconfigured.sh
+
 image_dir="./images"
 temp_dir="./temp"
 
@@ -36,13 +38,13 @@ echo "사용가능한 모드: "
 select vm_mode in "kube_main" "kube_worker"; do
   case "$vm_mode" in
     kube_main)
-      ignition_url="http://localhost:8000/ignition_main.json"
+      ignition_url="http://localhost:8000/k8s_main_ignition_template.bu"
       memory_size="4096"
       num_cpus="4"
       break
       ;;
     kube_worker)
-      ignition_url="http://localhost:8000/ignition_worker.json"
+      ignition_url="http://localhost:8000/k8s_worker_ingition_template."
       memory_size="2048"
       num_cpus="2"
       break
@@ -55,15 +57,18 @@ done
 
 mkdir -p "$temp_dir/$vm_name"
 
-ignition_path="$temp_dir/$vm_name/ignition.json"
-curl "$ignition_url" -o "$ignition_path"
+ignition_template_path="$temp_dir/$vm_name/ignition.bu"
+curl "$ignition_url" -o "$ignition_template_path"
 if [ $? -eq 0 ]; then
-    echo "파일 다운로드 성공!"
+    echo "이그니션 템플릿 파일 다운로드 성공!"
     cat "$ignition_path"
 else
     echo "파일 다운로드 실패! ./ignition-server/ignition.sh를 실행해서 서버를 켜세요."
     exit 1
 fi
+
+butane --pretty --strict < "$ignition_template_path" > "$ignition_path"
+ignition_path="$temp_dir/$vm_name/ignition.ign"
 
 # QEMU SSH 포트 포워딩 정보 입력
 read -p "Input your QEMU SSH port forwarding (host:guest): " ssh_port
@@ -108,7 +113,7 @@ nohup sudo qemu-system-aarch64 \
     -machine virt,highmem=on \
     -vga std \
     -serial vc \
-    -monitor none \
+    -monitor none 
     -parallel none \
-    -netdev vmnet-shared,id=kubenet -device virtio-net,netdev=kubenet \
+    -netdev vmnet-shared,id=kubenet,start-address=$PRECONFIGURED_VM_IP_START,end-address=$PRECONFIGURED_VM_IP_END,subnet-mask=$PRECONFIGURED_VM_IP_SUBNET -device virtio-net,netdev=kubenet \
     -name "$vm_name" > /dev/null 2> ./temp/vmerror.out &
