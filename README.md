@@ -9,7 +9,7 @@ The k8s nodes are communicating with each other through wireguard vpn.
 ## Running Sequence
 ```sh
 # Run ignition template server.
-./ignition-server.sh/ignition.sh
+./ignition-server/ignition.sh
 
 # Run wireguard vpn server on host machine.
 ## The wireguard vpn server is running on host machine with podman.
