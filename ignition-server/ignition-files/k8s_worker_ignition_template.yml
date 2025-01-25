@@ -20,6 +20,11 @@ storage:
           dns=8.8.8.8;1.1.1.1;
           [ipv6]
           method=ignore
+
+    - path: /etc/wireguard/wg0.conf
+      mode: 0600
+      contents:
+        source: data:text/plain;charset=utf-8;base64,$ENCODED_WG0_CONF_CONTENT
         
     # 워커 노드 초기화 스크립트
     - path: /etc/kubernetes/kubeadm-join.sh
@@ -48,6 +53,9 @@ storage:
 systemd:
   units:
     - name: NetworkManager.service
+      enabled: true
+      
+    - name: wg-quick@wg0.service
       enabled: true
 
     # kubeadm join 서비스
