@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # This script initializes a new virtual machine with Fedora CoreOS using QEMU.
-# The script will download the ignition template file from the server (./ignition-server/ignition.sh).
+# The script will download the ignition template file from the server (./ignition.sh).
 
 # 필요한 도구 확인
 command -v qemu-img >/dev/null 2>&1 || { echo >&2 "qemu-img is required. Please install qemu-img and try again."; exit 1; }
@@ -47,7 +47,7 @@ select vm_mode in "kube_main" "kube_worker"; do
       break
       ;;
     kube_worker)
-      ignition_url="http://localhost:8000/k8s_worker_ingition_template.yml"
+      ignition_url="http://localhost:8000/k8s_worker_ignition_template.yml"
       memory_size="2048"
       num_cpus="2"
       break
@@ -66,7 +66,7 @@ if [ $? -eq 0 ]; then
     echo "Downloaded ignition template file successfully!"
     cat "$ignition_template_path"
 else
-    echo "Failed to download file! Please run ./ignition-server/ignition.sh to start the server."
+    echo "Failed to download file! Please run ./ignition.sh to start the server."
     exit 1
 fi
 
@@ -96,6 +96,51 @@ sed "s|localhost|${HOST_IP}|g" $SOURCE_WG_FILE > $DEST_WG_FILE
 
 ignition_bu_path="$temp_dir/$vm_name/ignition.bu"
 export ENCODED_WG0_CONF_CONTENT=$(base64 -i "$DEST_WG_FILE" | tr -d '\n')
+
+ssh_pub_key_files=(~/.ssh/*.pub)
+need_new_ssh_key=false
+if [ ${#ssh_pub_key_files[@]} -eq 0 ]; then
+    echo "No SSH PUB KEY IN ~/.ssh directory."
+    echo "Creating a new SSH key pair..."
+    need_new_ssh_key=true
+else
+    echo "Some SSH PUB KEY IN ~/.ssh directory."
+    echo "Do you want to create a new SSH key pair?"
+    select yn in "Yes" "No"; do
+        case $yn in
+            Yes)
+                need_new_ssh_key=true
+                break
+                ;;
+            No)
+                need_new_ssh_key=false
+                break
+                ;;
+            *)
+                echo "Error: Invalid selection. Please try again."
+                ;;
+        esac
+    done
+fi
+
+if [ $need_new_ssh_key = true ]; then
+    read -p "Input your key name: " key_name
+    ssh-keygen -t rsa -b 4096 -C "$key_name" -f ~/.ssh/$key_name
+fi
+
+ssh_pub_key_files=(~/.ssh/*.pub)
+
+echo "Available SSH public key files:"
+select file in "${ssh_pub_key_files[@]}"; do
+    if [ -n "$file" ]; then
+        export SSH_PUB_KEY=$(cat $file | tr -d '\n')
+        echo "Selected SSH public key: $file"
+        break
+    else
+        echo "Error: Invalid selection. Please try again."
+    fi
+done
+
 envsubst < $ignition_template_path > $ignition_bu_path
 
 ignition_path="$temp_dir/$vm_name/ignition.ign"

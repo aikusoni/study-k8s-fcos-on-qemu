@@ -140,9 +140,6 @@ podman run -d \
 
 echo "${vpn_name} container has been created. Please check the logs or configuration directory."
 
-container_ip=$(podman inspect wireguard | jq -r ".[0].NetworkSettings.IPAddress")
-echo "Container IP: ${container_ip}"
-
 echo "Testing VPN connection..."
 client_config_file="${client_config_dir}/${PRECONFIGURED_WIREGUARD_CHECK_CLIENT_NO}/wg0.conf"
 echo "This wg config file will be used by host machine." > "${client_config_dir}/${PRECONFIGURED_WIREGUARD_CHECK_CLIENT_NO}/using.lock"

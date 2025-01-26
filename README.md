@@ -13,7 +13,7 @@
 ## Running Sequence
 ```sh
 # Run ignition template server.
-./ignition-server/ignition.sh
+./ignition.sh
 
 # Run wireguard vpn server on host machine.
 ## The wireguard vpn server is running on host machine with podman.
