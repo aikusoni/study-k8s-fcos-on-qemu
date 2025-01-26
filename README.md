@@ -45,9 +45,9 @@ architecture-beta
 
     service wireguard (internet) [wireguard] in podman
 
-    group vm1 [vm1] in local
-    group vm2 [vm2] in local
-    group vm3 [vm3] in local
+    group vm1 [fcos on qemu] in local
+    group vm2 [fcos on qemu] in local
+    group vm3 [fcos on qemu] in local
 
     service kubemain(logos:kubernetes)[K8S Control Plane] in vm1
     service kubeworker1(logos:kubernetes)[K8S Worker] in vm2
