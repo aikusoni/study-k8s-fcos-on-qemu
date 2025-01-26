@@ -4,7 +4,7 @@
 - This is my study project to run k8s cluster on my local machine.
 
 ## Specifications
-- This project is to run k8s cluster on macbook pro (m3).
+- The project is made to run k8s cluster on local machine.
 
 - The k8s cluster is running on fedora core os that is running on qemu.
 
@@ -20,10 +20,13 @@
 ## The wireguard vpn server is used to connect k8s nodes.
 ./host_vpn_server.sh
 
-# Run fedora core os on qemu. (k8s running on fedora core os)
+# Initialize fedora core os on qemu.
+./init_kube_vm_qemu.sh
+
 ## The fedora core os is running on qemu.
 ## The fedora core os is used to run k8s cluster.
-./init_kube_vm_qemu.sh
+## vmname is presented on before script.
+./machines/vmname/start_vm.sh
 ```
 
 ## Roadmap

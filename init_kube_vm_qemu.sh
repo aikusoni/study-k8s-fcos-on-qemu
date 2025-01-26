@@ -11,6 +11,18 @@ source ./preconfigured.sh
 image_dir="./images"
 temp_dir="./temp"
 
+# 새로운 VM 이름 입력
+read -p "Input your virtual machine name: " vm_name
+vm_dir="./machines/$vm_name"
+
+if [ -d "$vm_dir" ]; then
+    echo "VM directory already exists: $vm_dir"
+    echo "Run the script in $vm_dir/start_vm.sh to start the VM."
+    exit 1
+fi
+
+echo "Start to initialize a new VM : $vm_name"
+
 # 현재 디렉토리에서 사용 가능한 qcow2 이미지 선택
 qcow2_files=($image_dir/fedora-coreos*.qcow2)
 if [ ${#qcow2_files[@]} -eq 0 ]; then
@@ -32,9 +44,6 @@ else
         fi
     done
 fi
-
-# 새로운 VM 이름 입력
-read -p "Input your new virtual machine name: " vm_name
 
 # VM 모드 입력 및 Ignition URL 설정
 echo "Available modes: "
@@ -146,8 +155,7 @@ envsubst < $ignition_template_path > $ignition_bu_path
 ignition_path="$temp_dir/$vm_name/ignition.ign"
 butane --pretty < "$ignition_bu_path" > "$ignition_path"
 
-# 디렉토리 설정
-vm_dir="./machines/$vm_name"
+# vm 디렉토리 생성
 mkdir -p "$vm_dir"
 
 new_image="$vm_dir/fcos-vm.qcow2"
@@ -167,12 +175,22 @@ echo "New VM image created: $new_image"
 
 /bin/dd if=/dev/zero conv=sync bs=1m count=64 of=$vm_dir/pflash.img
 
+mac_last_byte=$(printf "%02x" $wireguard_client_no)
+
+echo "Making starting script... ($vm_dir/start_vm.sh)"
+cat <<EOF > $vm_dir/start_vm.sh
+#!/bin/bash
+
+if ps aux | grep -v grep | grep "qemu-system-aarch64" | grep -q "$vm_name"; then
+    echo "VM is already running: $vm_name"
+    exit 1
+fi
+
 # QEMU 실행
 echo "Next job needs sudo permission to run QEMU with vmnet-shared network."
 sudo -v
 
-mac_last_byte=$(printf "%02x" $wireguard_client_no)
-echo "Running QEMU..."
+echo "Running QEMU... $vm_name"
 nohup sudo qemu-system-aarch64 \
     -cpu host \
     -smp $num_cpus \
@@ -192,3 +210,7 @@ nohup sudo qemu-system-aarch64 \
     -netdev vmnet-shared,id=kubenet,start-address=$PRECONFIGURED_VM_IP_START,end-address=$PRECONFIGURED_VM_IP_END,subnet-mask=$PRECONFIGURED_VM_IP_SUBNET \
     -device virtio-net,netdev=kubenet,mac=52:54:00:12:34:${mac_last_byte} \
     -name "$vm_name" > /dev/null 2> ./temp/vmerror.out &
+EOF
+chmod +x $vm_dir/start_vm.sh
+
+echo "Run the VM with the following command: $vm_dir/start_vm.sh"
