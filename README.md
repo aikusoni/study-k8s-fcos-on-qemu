@@ -36,3 +36,24 @@
 - ✅ Connecting fedora core os to wireguard vpn.
 - 🚧 Initialize k8s control plane.
 - 🚧 Initialize k8s worker node.
+
+## Infrastructure Graph
+```mermaid
+architecture-beta
+    group local [local macihne]
+    group podman [podman] in local
+
+    service wireguard (internet) [wireguard] in podman
+
+    group vm1 [vm1] in local
+    group vm2 [vm2] in local
+    group vm3 [vm3] in local
+
+    service kubemain(logos:kubernetes)[K8S Control Plane] in vm1
+    service kubeworker1(logos:kubernetes)[K8S Worker] in vm2
+    service kubeworker2(logos:kubernetes)[K8S Worker] in vm3
+
+    wireguard:L -- B:kubemain
+    wireguard:B -- T:kubeworker1
+    wireguard:R -- B:kubeworker2
+```
