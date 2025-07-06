@@ -128,7 +128,7 @@ storage:
           ExecStartPre=/usr/bin/mkdir -p /opt/cni/bin
           
           ExecStart=/usr/bin/bash -c '\
-            curl -L https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-arm64-v1.7.1.tgz \
+            curl -L https://github.com/containernetworking/plugins/releases/download/v1.7.1/cni-plugins-linux-arm64-v1.7.1.tgz \
               | tar -C /opt/cni/bin -xz'
           RemainAfterExit=yes
 
@@ -243,7 +243,9 @@ systemd:
 
         [Service]
         Type=oneshot
-        ExecStart=/bin/sh -c '\
+        ExecStartPre=/usr/bin/bash -c '\
+          until [ -S /var/run/containerd/containerd.sock ] && ctr version &>/dev/null; do sleep 1; done'
+        ExecStart=/usr/bin/bash -c '\
           exec /usr/local/bin/kubeadm init \
             --config=/etc/kubeadm-config.yaml \
             --upload-certs \
