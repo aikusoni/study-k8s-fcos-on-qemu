@@ -151,9 +151,11 @@ storage:
           RemainAfterExit=yes
           Environment="KUBECONFIG=/etc/kubernetes/admin.conf"
 
-          ExecStartPre=/usr/bin/bash -c 'until curl -k -sSf https://127.0.0.1:6443/healthz >/dev/null; do sleep 1; done'
-          ExecStartPre=/usr/bin/bash -c 'until curl -k -sSf https://127.0.0.1:6443/readyz >/dev/null; do sleep 1; done'
-          ExecStartPre=/usr/bin/bash -c 'until curl -k -sSf https://127.0.0.1:6443/openapi/v2 >/dev/null; do sleep 1; done'
+          ExecStartPre=/usr/bin/bash -c 'until curl -k -sSf https://cluster-endpoint:6443/healthz >/dev/null; do sleep 1; done'
+          ExecStartPre=/usr/bin/bash -c 'until curl -k -sSf https://cluster-endpoint:6443/readyz >/dev/null; do sleep 1; done'
+          ExecStartPre=/usr/bin/bash -c '\
+            until kubectl --kubeconfig=/etc/kubernetes/admin.conf get --raw /openapi/v2 >/dev/null 2>&1; \
+            do sleep 1; done'
 
           ExecStart=/usr/local/bin/kubectl apply --validate=false -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
 
