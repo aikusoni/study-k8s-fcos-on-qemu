@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # This script initializes a new virtual machine with Fedora CoreOS using QEMU.
 # The script will download the ignition template file from the server (./ignition.sh).
 
@@ -10,6 +12,7 @@ source ./preconfigured.sh
 
 image_dir="./images"
 temp_dir="./temp"
+ssh_dir="./.ssh"
 
 # 새로운 VM 이름 입력
 read -p "Input your virtual machine name: " vm_name
@@ -47,20 +50,26 @@ fi
 
 # VM 모드 입력 및 Ignition URL 설정
 echo "Available modes: "
-select vm_mode in "kube_main" "kube_worker"; do
+select vm_mode in "kube_first_main" "kube_other_main" "kube_worker"; do
   case "$vm_mode" in
-    kube_main)
-      ignition_url="http://localhost:8000/k8s_main_ignition_template.yml"
-      memory_size="4096"
-      num_cpus="4"
-      break
-      ;;
+    kube_first_main)
+        ignition_url="http://localhost:8000/k8s_ignition_first_main.yml"
+        memory_size="4096"
+        num_cpus="4"
+        break
+        ;;
+    kube_other_main)
+        ignition_url="http://localhost:8000/k8s_ignition_other_main.yml"
+        memory_size="4096"
+        num_cpus="4"
+        break
+        ;;
     kube_worker)
-      ignition_url="http://localhost:8000/k8s_worker_ignition_template.yml"
-      memory_size="2048"
-      num_cpus="2"
-      break
-      ;;
+        ignition_url="http://localhost:8000/k8s_ignition_worker.yml"
+        memory_size="2048"
+        num_cpus="2"
+        break
+        ;;
     *)
       echo "Error: Invalid selection. Please try again."
       ;;
@@ -86,6 +95,7 @@ echo "Selected wireguard client no: $pad_wireguard_client_no"
 
 SOURCE_WG_FILE=./wireguard-client-config/wireguard-vpn/${pad_wireguard_client_no}/wg0.conf
 USING_WG_MARK_FILE=./wireguard-client-config/wireguard-vpn/${pad_wireguard_client_no}/using.lock
+WG_IP_ADDRESS=./wireguard-client-config/wireguard-vpn/${pad_wireguard_client_no}/wg_ip_address.txt
 
 if [ ! -f $SOURCE_WG_FILE ]; then
     echo "Error: Wireguard configuration file not found: $SOURCE_WG_FILE"
@@ -106,14 +116,18 @@ sed "s|localhost|${HOST_IP}|g" $SOURCE_WG_FILE > $DEST_WG_FILE
 ignition_bu_path="$temp_dir/$vm_name/ignition.bu"
 export ENCODED_WG0_CONF_CONTENT=$(base64 -i "$DEST_WG_FILE" | tr -d '\n')
 
-ssh_pub_key_files=(~/.ssh/*.pub)
+mkdir -p "$ssh_dir"
+
+shopt -s nullglob
+ssh_pub_key_files=("$ssh_dir"/*.pub)
+shopt -u nullglob
 need_new_ssh_key=false
 if [ ${#ssh_pub_key_files[@]} -eq 0 ]; then
-    echo "No SSH PUB KEY IN ~/.ssh directory."
+    echo "No SSH PUB KEY IN $ssh_dir directory."
     echo "Creating a new SSH key pair..."
     need_new_ssh_key=true
 else
-    echo "Some SSH PUB KEY IN ~/.ssh directory."
+    echo "Some SSH PUB KEY IN $ssh_dir directory."
     echo "Do you want to create a new SSH key pair?"
     select yn in "Yes" "No"; do
         case $yn in
@@ -132,12 +146,24 @@ else
     done
 fi
 
-if [ $need_new_ssh_key = true ]; then
-    read -p "Input your key name: " key_name
-    ssh-keygen -t rsa -b 4096 -C "$key_name" -f ~/.ssh/$key_name
+if [ "$need_new_ssh_key" = true ]; then
+  while true; do
+    read -p "Input your key name [coreos]: " key_name
+    key_name=${key_name:-coreos}
+
+    # 이미 해당 이름의 키 파일이 존재하는지 검사
+    if [ -e "$ssh_dir/$key_name" ] || [ -e "$ssh_dir/$key_name.pub" ]; then
+      echo "❌ \"$key_name\" is already exists in $ssh_dir directory."
+    else
+      break
+    fi
+  done
+
+  # 키 생성
+  ssh-keygen -t rsa -b 4096 -C "$key_name" -f "$ssh_dir/$key_name"
 fi
 
-ssh_pub_key_files=(~/.ssh/*.pub)
+ssh_pub_key_files=($ssh_dir/*.pub)
 
 echo "Available SSH public key files:"
 select file in "${ssh_pub_key_files[@]}"; do
@@ -150,10 +176,33 @@ select file in "${ssh_pub_key_files[@]}"; do
     fi
 done
 
+export ENC_WG0_CONF=$(openssl base64 -A -in "$DEST_WG_FILE")
+
+mac_tz=$(sudo systemsetup -gettimezone 2>/dev/null | awk -F': ' '{print $2}')
+if [ -z "$mac_tz" ]; then
+    echo "Error: Unable to detect macOS timezone."
+    exit 1
+fi
+export ZINCATI_TIMEZONE="$mac_tz"
+
+read -p "Enter Zincati reboot window start time [HH:MM, default 00:00]: " ZINCATI_START
+export ZINCATI_START=${ZINCATI_START:-00:00}
+
+read -p "Enter Zincati reboot window length in minutes [default 60]: " ZINCATI_LENGTH
+export ZINCATI_LENGTH=${ZINCATI_LENGTH:-60}
+
+echo "Zincati timezone: $ZINCATI_TIMEZONE"
+echo "Zincati reboot window start: $ZINCATI_START"
+echo "Zincati reboot window length: $ZINCATI_LENGTH"
+
+echo "Generating ignition file from template..."
+
 envsubst < $ignition_template_path > $ignition_bu_path
 
 ignition_path="$temp_dir/$vm_name/ignition.ign"
 butane --pretty < "$ignition_bu_path" > "$ignition_path"
+
+echo "You can check the generated ignition file at: $ignition_path"
 
 # vm 디렉토리 생성
 mkdir -p "$vm_dir"
@@ -191,7 +240,7 @@ echo "Next job needs sudo permission to run QEMU with vmnet-shared network."
 sudo -v
 
 echo "Running QEMU... $vm_name"
-nohup sudo qemu-system-aarch64 \
+nohup sudo caffeinate -i qemu-system-aarch64 \
     -cpu host \
     -smp $num_cpus \
     -m $memory_size \
@@ -213,4 +262,15 @@ nohup sudo qemu-system-aarch64 \
 EOF
 chmod +x $vm_dir/start_vm.sh
 
+# If control-plane mode, register IP
+if [[ "$vm_mode" =~ ^kube_.*_main$ ]]; then
+  mkdir -p loadbalancing
+  cp="loadbalancing/control-plane.txt"
+  touch "$cp"
+  cat "$WG_IP_ADDRESS" >> "$cp"
+  echo "[INFO] Added $WG_IP_ADDRESS to $cp"
+  echo "[INFO] Please run control_plane_load_balancer.sh to update the HAProxy configuration."
+fi
+
 echo "Run the VM with the following command: $vm_dir/start_vm.sh"
+echo "or use ./start_vm_machine.sh to start the VM."

@@ -1,0 +1,72 @@
+variant: fcos
+version: 1.6.0
+
+storage:
+directories:
+# ensure pki directory for certificates
+- path: /etc/kubernetes/pki
+mode: 0700
+
+files:
+  - path: /etc/hosts
+    mode: 0644
+    overwrite: false
+    append:
+      - inline: |
+          ${PRECONFIGURED_HOST_IP} cluster-endpoint
+
+  # kubeadm join configuration
+  - path: /etc/kubeadm-join.yaml
+    mode: 0644
+    contents:
+      inline: |
+        apiVersion: kubeadm.k8s.io/v1beta4
+        kind: JoinConfiguration
+        discovery:
+          bootstrapToken:
+            token: ${JOIN_TOKEN}
+            apiServerEndpoint: cluster-endpoint:6443
+            caCertHashes:
+              - sha256:${DISCOVERY_TOKEN_CA_HASH}
+        controlPlane:
+          certificateKey: ${CERT_KEY}
+        nodeRegistration:
+          criSocket: unix:///var/run/containerd/containerd.sock
+          kubeletExtraArgs:
+            volume-plugin-dir: /var/lib/kubelet/kubelet-plugins/volume/exec
+
+  # kubeadm, kubectl, kubelet binaries
+  - path: /usr/local/bin/kubeadm
+    mode: 0755
+    contents:
+      source: "https://dl.k8s.io/release/v${K8S_VERSION}/bin/linux/arm64/kubeadm"
+  - path: /usr/local/bin/kubectl
+    mode: 0755
+    contents:
+      source: "https://dl.k8s.io/release/v${K8S_VERSION}/bin/linux/arm64/kubectl"
+  - path: /usr/local/bin/kubelet
+    mode: 0755
+    contents:
+      source: "https://dl.k8s.io/release/v${K8S_VERSION}/bin/linux/arm64/kubelet"
+
+  # containerd config
+  - path: /etc/containerd/config.toml
+    mode: 0644
+    overwrite: true
+    contents:
+      inline: |
+        version = 2
+        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+          runtime_type = "io.containerd.runc.v2"
+
+  # sysctl & modules for k8s
+  - path: /etc/modules-load.d/br_netfilter.conf
+    mode: 0644
+    contents:
+      inline: br_netfilter
+  - path: /etc/sysctl.d/kubernetes.conf
+    mode: 0644
+    contents:
+      inline: |
+        net.bridge.bridge-nf-call-iptables=1
+        net.ipv4.ip_forward=1

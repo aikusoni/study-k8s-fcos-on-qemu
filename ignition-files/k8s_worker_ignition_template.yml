@@ -25,30 +25,39 @@ storage:
       mode: 0600
       contents:
         source: data:text/plain;charset=utf-8;base64,$ENCODED_WG0_CONF_CONTENT
+
+    - path: /usr/local/bin/kubectl
+      mode: 0755
+      contents:
+        source: https://dl.k8s.io/release/v${K8S_VERSION}/bin/linux/arm64/kubectl
         
-    # 워커 노드 초기화 스크립트
-    - path: /etc/kubernetes/kubeadm-join.sh
-      mode: 0700
-      user:
-        id: 1000
-      group:
-        id: 1000
+    - path: /usr/local/bin/kubelet
+      mode: 0755
+      contents:
+        source: https://dl.k8s.io/release/v${K8S_VERSION}/bin/linux/arm64/kubelet
+
+    - path: /etc/containerd/config.toml
+      mode: 0644
+      overwrite: true
       contents:
         inline: |
-          #!/usr/bin/env bash
-          set -e
-
-          # 컨테이너 런타임 설정 (containerd)
-          cat <<EOF > /etc/containerd/config.toml
           version = 2
           [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
             runtime_type = "io.containerd.runc.v2"
-          EOF
+            
+    - path: /etc/modules-load.d/br_netfilter.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: br_netfilter
 
-          systemctl restart containerd
-
-          # Kubernetes 클러스터에 조인
-          kubeadm join 192.168.222.2:6443 --token <TOKEN> --discovery-token-ca-cert-hash sha256:<HASH>
+    - path: /etc/sysctl.d/kubernetes.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          net.bridge.bridge-nf-call-iptables=1
+          net.ipv4.ip_forward=1
 
 systemd:
   units:
@@ -57,23 +66,6 @@ systemd:
       
     - name: wg-quick@wg0.service
       enabled: true
-
-    # kubeadm join 서비스
-    - name: kubeadm-join.service
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Join Kubernetes cluster using kubeadm
-        After=network-online.target NetworkManager-wait-online.service
-        Wants=network-online.target NetworkManager-wait-online.service
-
-        [Service]
-        Type=oneshot
-        ExecStart=/etc/kubernetes/kubeadm-join.sh
-        RemainAfterExit=yes
-
-        [Install]
-        WantedBy=multi-user.target
 
     # kubelet 서비스 설정
     - name: kubelet.service

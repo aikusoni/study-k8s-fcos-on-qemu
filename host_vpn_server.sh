@@ -18,7 +18,7 @@ fi
 
 source ./preconfigured.sh
 
-machine_name="podman-machine-vpn"
+machine_name="${PODMAN_MACHINE_NAME}"
 
 # Podman machine 목록에서 <machine_name>:true 형태로 Running 여부를 확인
 # 만약 해당 machine이 없거나 실행 중이 아니면 초기화 & 시작
@@ -107,6 +107,8 @@ Endpoint = localhost:51820
 AllowedIPs = $ip_cidr
 PersistentKeepalive = 25
 EOF
+
+  echo "${client_ip}" > "${client_config_dir}/${client_number}/wg_ip_address.txt"
 
   echo "Client $client_number configuration generated."
 
