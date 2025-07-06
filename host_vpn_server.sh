@@ -129,6 +129,7 @@ done
 echo "Creating WireGuard VPN container..."
 podman run -d \
   --name "${vpn_name}" \
+  --network slirp4netns:allow_host_loopback=true \
   --cap-add=NET_ADMIN \
   -p=51820:51820/udp \
   -p=51821:51821/tcp \
