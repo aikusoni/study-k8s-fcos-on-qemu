@@ -1,72 +1,69 @@
+# ignition_join_master_envsubst.yaml
 variant: fcos
 version: 1.6.0
 
 storage:
-directories:
-# ensure pki directory for certificates
-- path: /etc/kubernetes/pki
-mode: 0700
+  files:
+    # 1) JoinConfig 파일을 미리 만들어 둡니다
+    - path: /etc/kubeadm-join-config.yaml
+      mode: 0644
+      contents:
+        inline: |
+          apiVersion: kubeadm.k8s.io/v1beta4
+          kind: JoinConfiguration
+          discovery:
+            bootstrapToken:
+              token: "${JOIN_TOKEN}"
+              apiServerEndpoint: "cluster-endpoint:6443"
+              caCertHashes:
+                - "${DISCOVERY_HASH}"
+          controlPlane:
+            certificateKey: "${CERT_KEY}"
+            localAPIEndpoint:
+              advertiseAddress: "{{ .NetworkConfig.AdvertiseAddress }}"
+              bindPort: 6443
+          nodeRegistration:
+            criSocket: unix:///var/run/containerd/containerd.sock
 
-files:
-  - path: /etc/hosts
-    mode: 0644
-    overwrite: false
-    append:
-      - inline: |
-          ${PRECONFIGURED_HOST_IP} cluster-endpoint
+    # 2) systemd unit: kubeadm join --control-plane
+    - path: /etc/systemd/system/kubeadm-join.service
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=Join this node to the existing control plane
+          Wants=containerd.service network-online.target
+          After=containerd.service containerd.socket network-online.target
 
-  # kubeadm join configuration
-  - path: /etc/kubeadm-join.yaml
-    mode: 0644
-    contents:
-      inline: |
-        apiVersion: kubeadm.k8s.io/v1beta4
-        kind: JoinConfiguration
-        discovery:
-          bootstrapToken:
-            token: ${JOIN_TOKEN}
-            apiServerEndpoint: cluster-endpoint:6443
-            caCertHashes:
-              - sha256:${DISCOVERY_TOKEN_CA_HASH}
-        controlPlane:
-          certificateKey: ${CERT_KEY}
-        nodeRegistration:
-          criSocket: unix:///var/run/containerd/containerd.sock
-          kubeletExtraArgs:
-            volume-plugin-dir: /var/lib/kubelet/kubelet-plugins/volume/exec
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          Environment="KUBECONFIG=/etc/kubernetes/admin.conf"
+          # containerd 준비 대기
+          ExecStartPre=/usr/bin/bash -c 'until [ -S /var/run/containerd/containerd.sock ] && ctr version &>/dev/null; do sleep 1; done'
+          ExecStart=/usr/local/bin/kubeadm join \
+            --config=/etc/kubeadm-join-config.yaml \
+            --ignore-preflight-errors=all
+          StandardOutput=journal+console
+          StandardError=journal+console
 
-  # kubeadm, kubectl, kubelet binaries
-  - path: /usr/local/bin/kubeadm
-    mode: 0755
-    contents:
-      source: "https://dl.k8s.io/release/v${K8S_VERSION}/bin/linux/arm64/kubeadm"
-  - path: /usr/local/bin/kubectl
-    mode: 0755
-    contents:
-      source: "https://dl.k8s.io/release/v${K8S_VERSION}/bin/linux/arm64/kubectl"
-  - path: /usr/local/bin/kubelet
-    mode: 0755
-    contents:
-      source: "https://dl.k8s.io/release/v${K8S_VERSION}/bin/linux/arm64/kubelet"
+          [Install]
+          WantedBy=multi-user.target
 
-  # containerd config
-  - path: /etc/containerd/config.toml
-    mode: 0644
-    overwrite: true
-    contents:
-      inline: |
-        version = 2
-        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
-          runtime_type = "io.containerd.runc.v2"
+systemd:
+  units:
+    # containerd/kubelet 활성화(첫 마스터와 동일)
+    - name: containerd.service
+      enabled: true
+    - name: kubelet.service
+      enabled: true
 
-  # sysctl & modules for k8s
-  - path: /etc/modules-load.d/br_netfilter.conf
-    mode: 0644
-    contents:
-      inline: br_netfilter
-  - path: /etc/sysctl.d/kubernetes.conf
-    mode: 0644
-    contents:
-      inline: |
-        net.bridge.bridge-nf-call-iptables=1
-        net.ipv4.ip_forward=1
+    # kubeadm-join 서비스 활성화
+    - name: kubeadm-join.service
+      enabled: true
+
+passwd:
+  users:
+    - name: core
+      ssh_authorized_keys:
+        - $SSH_PUB_KEY

@@ -14,7 +14,7 @@ storage:
       overwrite: false
       append:
         - inline: |
-            127.0.0.1 cluster-endpoint
+            ${CLUSTER_LOAD_BALANCER_END_POINT} cluster-endpoint
 
     # ───────── NetworkManager & WireGuard & SSH ─────────
     - path: /etc/NetworkManager/system-connections/ens160.nmconnection

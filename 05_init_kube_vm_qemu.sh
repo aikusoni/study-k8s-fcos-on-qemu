@@ -88,7 +88,8 @@ else
     exit 1
 fi
 
-read -p "Input your wireguard client no (3-254): " wireguard_client_no
+echo "Wireguard client 1-10 are reserved for the wg hub, host machine and load balancer."
+read -p "Input your wireguard client no (11-254): " wireguard_client_no
 pad_wireguard_client_no=$(printf "%03d" $wireguard_client_no)
 
 echo "Selected wireguard client no: $pad_wireguard_client_no"
@@ -264,12 +265,12 @@ chmod +x $vm_dir/start_vm.sh
 
 # If control-plane mode, register IP
 if [[ "$vm_mode" =~ ^kube_.*_main$ ]]; then
-  mkdir -p loadbalancing
-  cp="loadbalancing/control-plane.txt"
+  mkdir -p .loadbalancer
+  cp=".loadbalancer/main-addresses.txt"
   touch "$cp"
   cat "$WG_IP_ADDRESS" >> "$cp"
   echo "[INFO] Added $WG_IP_ADDRESS to $cp"
-  echo "[INFO] Please run control_plane_load_balancer.sh to update the HAProxy configuration."
+  echo "[INFO] Please run UT_renew_loadbalancer.sh to update the HAProxy configuration."
 fi
 
 echo "Run the VM with the following command: $vm_dir/start_vm.sh"

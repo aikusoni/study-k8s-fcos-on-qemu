@@ -25,6 +25,6 @@ rm -rf temp
 rm -rf machines
 rm -rf wireguard-client-config/wireguard-vpn/*/using.lock
 rm -rf .ssh
-rm -rf loadbalancing
+rm -rf .loadbalancer/main-addresses.txt
 
 echo "Cleaning done."

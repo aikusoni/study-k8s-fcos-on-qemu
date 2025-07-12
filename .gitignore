@@ -4,4 +4,5 @@
 /wireguard-client-config
 /keys
 /.ssh
-/loadbalancing
+/.logs
+/.loadbalancer
