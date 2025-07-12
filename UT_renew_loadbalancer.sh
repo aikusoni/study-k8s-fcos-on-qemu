@@ -44,14 +44,14 @@ backend k8s_masters
 EOF
 
 # append each master address if main-addresses.txt exists
-if [ -f main-addresses.txt ]; then
+if [ -f "$MAIN_ADDRESSES_FILE" ]; then
   idx=0
   while read -r ip; do
     echo "    server master${idx} ${ip}:${CLUSTER_PORT} check inter 5s fall 2 rise 3" >> "$HAPROXY_PATH"
     idx=$((idx + 1))
-  done < main-addresses.txt
+  done < "$MAIN_ADDRESSES_FILE"
 else
-  echo "[INFO] main-addresses.txt not found, skipping backend entries"
+  echo "[INFO] "$MAIN_ADDRESSES_FILE" not found, skipping backend entries"
 fi
 
 # optional stats section (unchanged)

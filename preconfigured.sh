@@ -12,8 +12,9 @@ export HAPROXY_STAT_USER=admin
 export HAPROXY_STAT_PASSWORD=admin1234
 
 
-lb_dir="$(pwd)/.loadbalancer"
-export HAPROXY_PATH="$lb_dir/haproxy.cfg"
+export LOADBALANCER_CONF_DIR="$(pwd)/.loadbalancer"
+export HAPROXY_PATH="$LOADBALANCER_CONF_DIR/haproxy.cfg"
+export MAIN_ADDRESSES_FILE="$LOADBALANCER_CONF_DIR/main-addresses.txt"
 export CLUSTER_PORT=6443
 
 export PODMAN_MACHINE_NAME="podman-machine-default"

@@ -265,12 +265,12 @@ chmod +x $vm_dir/start_vm.sh
 
 # If control-plane mode, register IP
 if [[ "$vm_mode" =~ ^kube_.*_main$ ]]; then
-  mkdir -p .loadbalancer
-  cp=".loadbalancer/main-addresses.txt"
-  touch "$cp"
-  cat "$WG_IP_ADDRESS" >> "$cp"
-  echo "[INFO] Added $WG_IP_ADDRESS to $cp"
-  echo "[INFO] Please run UT_renew_loadbalancer.sh to update the HAProxy configuration."
+  mkdir -p $LOADBALANCER_CONF_DIR
+  touch "$MAIN_ADDRESSES_FILE"
+  cat "$WG_IP_ADDRESS" >> "$MAIN_ADDRESSES_FILE"
+  echo "[INFO] Added $WG_IP_ADDRESS to $MAIN_ADDRESSES_FILE"
+  ./UT_renew_loadbalancer.sh
+  echo "[INFO] Load balancer updated with new main address."
 fi
 
 echo "Run the VM with the following command: $vm_dir/start_vm.sh"
