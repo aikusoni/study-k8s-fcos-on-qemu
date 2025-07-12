@@ -8,7 +8,7 @@ export PRECONFIGURED_VM_IP_END=192.168.128.200
 export PRECONFIGURED_VM_IP_SUBNET=255.255.255.0
 export K8S_VERSION=1.33.0
 
-export PODMAN_MACHINE_NAME="podman-machine-vpn"
+export PODMAN_MACHINE_NAME="podman-machine-default"
 
 export CLUSTER_NAME="my-k8s-cluster"
 

@@ -50,7 +50,8 @@ if podman container inspect "${vpn_name}" &>/dev/null; then
     exit 0
   fi
 
-  echo "'${vpn_name}' container is stopped. Starting..."
+  echo "'${vpn_name}' container is 
+  . Starting..."
   podman start "${vpn_name}"
   exit 0
 fi
@@ -126,11 +127,12 @@ EOF
 done
 
 # WireGuard VPN 컨테이너 생성
+# Hub And Spoke Topology
 echo "Creating WireGuard VPN container..."
 podman run -d \
   --name "${vpn_name}" \
-  --network slirp4netns:allow_host_loopback=true \
   --cap-add=NET_ADMIN \
+  --sysctl net.ipv4.ip_forward=1 \
   -p=51820:51820/udp \
   -p=51821:51821/tcp \
   -v "$config_dir:/config" \
