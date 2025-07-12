@@ -58,6 +58,14 @@ storage:
       contents:
         source: "https://dl.k8s.io/release/v${K8S_VERSION}/bin/linux/arm64/kubelet"
 
+    - path: /var/lib/kubelet/config.yaml
+      mode: 0644
+      contents:
+        inline: |
+          apiVersion: kubelet.config.k8s.io/v1beta1
+          kind: KubeletConfiguration
+          volumePluginDir: /var/lib/kubelet/kubelet-plugins/volume/exec
+
     - path: /etc/kubeadm-config.yaml
       mode: 0644
       contents:
@@ -89,6 +97,13 @@ storage:
                 mountPath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
                 readOnly: false
                 pathType: DirectoryOrCreate
+          
+          ---
+          apiVersion: kubelet.config.k8s.io/v1beta1
+          kind: KubeletConfiguration
+          # kubelet specific options here
+          
+          volumePluginDir: /var/lib/kubelet/kubelet-plugins/volume/exec
 
     # ───────── Containerd 설정 ─────────
     - path: /etc/containerd/config.toml
@@ -222,7 +237,7 @@ systemd:
         ExecStart=
         ExecStart=/usr/local/bin/kubelet \
           --config=/var/lib/kubelet/config.yaml \
-          --kubeconfig=/etc/kubernetes/kubelet.conf
+          --kubeconfig=/etc/kubernetes/kubelet.conf 
           
         Restart=always
         StartLimitInterval=0

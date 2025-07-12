@@ -36,14 +36,36 @@ fi
 ssh_key="${priv_keys[$((key_choice-1))]}"
 echo "▶ Using SSH key: $ssh_key"
 
-# 2) VM IP 입력
-read -rp "Enter VM IP [e.g. $PRECONFIGURED_VM_IP_START]: " vm_ip
-if [[ -z "$vm_ip" ]]; then
-  echo "❌ VM IP를 입력하지 않았습니다."
+# 2) WireGuard VPN IP 목록 선택
+vpn_base_dir="./wireguard-client-config/wireguard-vpn"
+shopt -s nullglob
+ips=()
+dirs=()
+for dir in "$vpn_base_dir"/*; do
+  if [[ -f "$dir/using.lock" ]] && [[ -f "$dir/wg_ip_address.txt" ]]; then
+    ip=$(<"$dir/wg_ip_address.txt")
+    ips+=("$ip")
+    dirs+=("$(basename "$dir")")
+  fi
+done
+shopt -u nullglob
+
+if [ ${#ips[@]} -eq 0 ]; then
+  echo "❌ 사용 중인 WireGuard VPN이 없습니다."
   exit 1
 fi
 
-echo "▶ Connecting to VM at $vm_ip"
+echo "Available WireGuard VPN IPs:"
+for i in "${!ips[@]}"; do
+  printf "  [%d] %s (%s)\n" "$((i+1))" "${ips[i]}" "${dirs[i]}"
+done
+read -rp "Select VPN IP (1-${#ips[@]}): " vpn_choice
+if ! [[ "$vpn_choice" =~ ^[0-9]+$ ]] || [ "$vpn_choice" -lt 1 ] || [ "$vpn_choice" -gt "${#ips[@]}" ]; then
+  echo "❌ Invalid selection: $vpn_choice"
+  exit 1
+fi
+vm_ip="${ips[$((vpn_choice-1))]}"
+echo "▶ Connecting to VPN VM at $vm_ip"
 
 # 3) SSH 접속
 ssh -i "$ssh_key" \
