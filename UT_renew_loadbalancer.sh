@@ -55,7 +55,7 @@ else
 fi
 
 # optional stats section (unchanged)
-cat << EOF > "$HAPROXY_PATH" 
+cat << EOF >> "$HAPROXY_PATH" 
 
 ############################################
 # optional: HAProxy 통계 페이지
