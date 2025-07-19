@@ -58,6 +58,8 @@ else
     export INIT_CERT_KEY=$(cat "$KUBEADM_CERT_KEY_PATH")
 fi
 
+echo "Using INIT_CERT_KEY: $INIT_CERT_KEY"  
+
 # VM 모드 입력 및 Ignition URL 설정
 echo "Available modes: "
 select vm_mode in "kube_first_main" "kube_other_main" "kube_worker"; do

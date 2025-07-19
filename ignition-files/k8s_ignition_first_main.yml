@@ -82,7 +82,7 @@ storage:
             kubeletExtraArgs:
               - name: volume-plugin-dir
                 value: /var/lib/kubelet/kubelet-plugins/volume/exec
-          certificateKey: "${KUBEADM_CERT_KEY}"
+          certificateKey: "${INIT_CERT_KEY}"
 
           ---
           apiVersion: kubeadm.k8s.io/v1beta4
