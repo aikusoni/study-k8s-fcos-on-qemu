@@ -77,6 +77,8 @@ storage:
         inline: |
           apiVersion: kubeadm.k8s.io/v1beta4
           kind: JoinConfiguration
+          featureGates:
+            EtcdLearnerMode: true
           discovery:
             bootstrapToken:
               apiServerEndpoint: cluster-endpoint:${CLUSTER_PORT}
