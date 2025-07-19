@@ -31,7 +31,7 @@ defaults
 # frontend for Kubernetes API server
 ############################################
 frontend kubernetes_api
-    bind ${PRECONFIGURED_HOST_WIREGUARD_CLIENT_NO}:${CLUSTER_PORT}
+    bind *:${CLUSTER_PORT}
     default_backend k8s_masters
 
 ############################################
@@ -72,7 +72,11 @@ EOF
 # Ensure HAProxy container exists
 if ! podman ps -a --format '{{.Names}}' | grep -qw haproxy; then
   echo "[INFO] Creating HAProxy container (paused)..."
-  podman create --name haproxy --network host haproxy:latest
+  podman create \
+    --name haproxy \
+    -p ${CLUSTER_PORT}:${CLUSTER_PORT} \
+    -p 9000:9000 \
+    haproxy:latest
 fi
 
 # Copy new config into HAProxy container
@@ -87,6 +91,8 @@ else
   echo "[INFO] Reloading HAProxy with HUP..."
   podman kill --signal HUP haproxy
 fi
+
+
 
 # Test and reload HAProxy
 podman exec haproxy haproxy -f /usr/local/etc/haproxy/haproxy.cfg -c || {

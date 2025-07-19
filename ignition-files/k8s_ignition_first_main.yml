@@ -164,6 +164,8 @@ storage:
           [Service]
           Type=oneshot
           RemainAfterExit=yes
+          Restart=on-failure
+          RestartSec=5s
           Environment="KUBECONFIG=/etc/kubernetes/admin.conf"
 
           ExecStartPre=/usr/bin/bash -c 'until curl -k -sSf https://cluster-endpoint:6443/healthz >/dev/null; do sleep 1; done'
@@ -217,7 +219,7 @@ systemd:
         [Service]
         User=root
         ExecStart=/usr/bin/containerd
-        Restart=always
+        Restart=on-failure
         RestartSec=5
 
         [Install]
@@ -239,7 +241,7 @@ systemd:
           --config=/var/lib/kubelet/config.yaml \
           --kubeconfig=/etc/kubernetes/kubelet.conf 
           
-        Restart=always
+        Restart=on-failure
         StartLimitInterval=0
         RestartSec=10
 

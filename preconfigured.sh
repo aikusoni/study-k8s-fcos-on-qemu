@@ -11,7 +11,6 @@ export K8S_VERSION=1.33.0
 export HAPROXY_STAT_USER=admin
 export HAPROXY_STAT_PASSWORD=admin1234
 
-
 export LOADBALANCER_CONF_DIR="$(pwd)/.loadbalancer"
 export HAPROXY_PATH="$LOADBALANCER_CONF_DIR/haproxy.cfg"
 export MAIN_ADDRESSES_FILE="$LOADBALANCER_CONF_DIR/main-addresses.txt"
