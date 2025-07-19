@@ -92,7 +92,7 @@ storage:
             localAPIEndpoint:
               advertiseAddress: ${WG_IP_ADDRESS}
               bindPort: ${CLUSTER_PORT}
-          certificateKey: "${INIT_CERT_KEY}"
+            certificateKey: "${INIT_CERT_KEY}"
           
           ---
           apiVersion: kubelet.config.k8s.io/v1beta1
