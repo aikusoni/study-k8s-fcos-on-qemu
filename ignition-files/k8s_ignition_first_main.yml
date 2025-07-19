@@ -90,6 +90,7 @@ storage:
             certSANs:
               - "cluster-endpoint"
               - "127.0.0.1"
+              - "localhost"
           controllerManager:
             extraVolumes:
               - name: flexvolume-dir

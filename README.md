@@ -3,30 +3,40 @@
 ## Overview
 - This is my study project to run k8s cluster on my local machine.
 
-## Specifications
-- The project is made to run k8s cluster on local machine.
+## Test Environment
+- Host Machine : MacBook Pro (Apple M3 Max)
+- QEMU : QEMU emulator version 9.2.0
+- FCOS Image : fedora-coreos-42.20250623.3.1-qemu.aarch64.qcow2
+- Podman Version : 5.5.2
 
-- The k8s cluster is running on fedora core os that is running on qemu.
-
-- The k8s nodes are communicating with each other through wireguard vpn.
+## File structure
+- ./ignition-files : fcos ignition files for k8s control plane and worker node.
+- ./images : FCOS image files (It is not included in this repository).
 
 ## Running Sequence
 ```sh
-# Run ignition template server.
-./ignition.sh
+# Run podman machine.
+./00_run_podman_machine.sh
 
-# Run wireguard vpn server on host machine.
-## The wireguard vpn server is running on host machine with podman.
-## The wireguard vpn server is used to connect k8s nodes.
-./host_vpn_server.sh
+# Run wireguard container onto podman.
+./01_run_podman_wg.sh
 
-# Initialize fedora core os on qemu.
-./init_kube_vm_qemu.sh
+# Connect to the wireguard container to communicate with k8s node Virtual Machine in host machine.
+./02_conenct_wg.sh
 
-## The fedora core os is running on qemu.
-## The fedora core os is used to run k8s cluster.
-## vmname is presented on before script.
-./machines/vmname/start_vm.sh
+# Run haproxy for clustering.
+./03_run_cluster_load_balancer.sh
+
+# Run ignition distribution servers on host machine to initialize fcos.
+./04_ignition_server.sh 
+# or execute 'nohup ./04_ignition_server.sh &' to avoid blocking the terminal.
+
+# Initialize fcos on qemu.
+# This script make vm image and run qemu with fcos.
+./05_init_kube_vm_qemu.sh
+
+# Run VM via below scripts.
+./u_start_vm.sh
 ```
 
 ## Roadmap

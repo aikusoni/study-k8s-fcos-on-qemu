@@ -27,12 +27,14 @@ fi
 echo "Start to initialize a new VM : $vm_name"
 
 # 현재 디렉토리에서 사용 가능한 qcow2 이미지 선택
-qcow2_files=($image_dir/fedora-coreos*.qcow2)
-if [ ${#qcow2_files[@]} -eq 0 ]; then
+if ! compgen -G "$image_dir/fedora-coreos*.qcow2" >/dev/null; then
     echo "Error: No 'fedora-coreos*.qcow2' files in $image_dir directory."
     echo "Please download from https://fedoraproject.org/coreos/download?stream=stable#download_section and try again."
     exit 1
-elif [ ${#qcow2_files[@]} -eq 1 ]; then
+fi
+
+qcow2_files=($image_dir/fedora-coreos*.qcow2)
+if [ ${#qcow2_files[@]} -eq 1 ]; then
     qcow2_image="${qcow2_files[0]}"
     echo "Selected qcow2 image: $qcow2_image"
 else
