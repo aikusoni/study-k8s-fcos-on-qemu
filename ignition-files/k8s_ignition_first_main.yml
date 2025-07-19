@@ -73,6 +73,7 @@ storage:
           apiVersion: kubeadm.k8s.io/v1beta4
           kind: InitConfiguration
           nodeRegistration:
+            name: master-${TIMESTAMP_NODE_NAME}
             criSocket: unix:///var/run/containerd/containerd.sock
             kubeletExtraArgs:
               - name: volume-plugin-dir
@@ -239,6 +240,7 @@ systemd:
         User=root
         ExecStart=
         ExecStart=/usr/local/bin/kubelet \
+          --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf \
           --config=/var/lib/kubelet/config.yaml \
           --kubeconfig=/etc/kubernetes/kubelet.conf 
           

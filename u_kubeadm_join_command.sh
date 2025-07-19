@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
+# kubeadm_join_instruction.sh
 set -euo pipefail
+
+output_file="${1:-}"
+
+echo "kubeadm join 명령어를 자동으로 출력합니다."
 
 # 환경 설정 파일 로드 (PRECONFIGURED_VM_IP_START 등)
 source ./preconfigured.sh
@@ -21,6 +26,7 @@ if [ ${#priv_keys[@]} -eq 0 ]; then
   exit 1
 fi
 
+echo "Select SSH key to connect to the master node."
 echo "Available SSH private keys:"
 for i in "${!priv_keys[@]}"; do
   printf "  [%d] %s\n" "$((i+1))" "${priv_keys[i]}"
@@ -52,6 +58,9 @@ if [ ${#ips[@]} -eq 0 ]; then
   exit 1
 fi
 
+echo ""
+
+echo "Select WireGuard VPN IP to connect to the master node."
 echo "Available WireGuard VPN IPs:"
 for i in "${!ips[@]}"; do
   printf "  [%d] %s (%s)\n" "$((i+1))" "${ips[i]}" "${dirs[i]}"
@@ -64,8 +73,17 @@ fi
 vm_ip="${ips[$((vpn_choice-1))]}"
 echo "▶ Connecting to VPN VM at $vm_ip"
 
-# 3) SSH 접속
-ssh -i "$ssh_key" \
+# VM에 SSH 접속해서 kubeadm join 명령어만 추출
+join_cmd=$(ssh -i "$ssh_key" \
     -o UserKnownHostsFile="$known_hosts_file" \
     -o StrictHostKeyChecking=accept-new \
-    core@"$vm_ip"
+    core@"$vm_ip" \
+    "kubeadm token create --print-join-command" \
+)
+
+# 출력
+if [ -n "$output_file" ]; then
+  echo "$join_cmd" > "$output_file"
+else
+  echo "$join_cmd"
+fi

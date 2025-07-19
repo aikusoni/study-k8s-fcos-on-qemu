@@ -1,69 +1,218 @@
-# ignition_join_master_envsubst.yaml
+# ignition_first_master_envsubst.yaml
 variant: fcos
 version: 1.6.0
 
 storage:
+  # 1) /etc/kubernetes/pki 디렉토리 생성
+  directories:
+    - path: /etc/kubernetes/pki
+      mode: 0700
+
   files:
-    # 1) JoinConfig 파일을 미리 만들어 둡니다
-    - path: /etc/kubeadm-join-config.yaml
+    - path: /etc/hosts
+      mode: 0644
+      overwrite: false
+      append:
+        - inline: |
+            ${CLUSTER_LOAD_BALANCER_END_POINT} cluster-endpoint
+
+    # ───────── NetworkManager & WireGuard & SSH ─────────
+    - path: /etc/NetworkManager/system-connections/ens160.nmconnection
+      mode: 0600
+      contents:
+        inline: |
+          [connection]
+          id=ens160
+          type=ethernet
+          interface-name=ens160
+          [ipv4]
+          method=dhcp
+          dns=8.8.8.8;1.1.1.1;
+          [ipv6]
+          method=ignore
+
+    - path: /etc/wireguard/wg0.conf
+      mode: 0600
+      contents:
+        source: 'data:text/plain;charset=utf-8;base64,${ENC_WG0_CONF}'
+
+    - path: /home/core/.ssh/authorized_keys
+      mode: 0600
+      contents:
+        inline: |
+          $SSH_PUB_KEY
+
+    # ───────── kubeadm, kubectl, kubelet 바이너리 ─────────
+    - path: /usr/local/bin/kubeadm
+      mode: 0755
+      contents:
+        source: "https://dl.k8s.io/release/v${K8S_VERSION}/bin/linux/arm64/kubeadm"
+
+    - path: /usr/local/bin/kubectl
+      mode: 0755
+      contents:
+        source: "https://dl.k8s.io/release/v${K8S_VERSION}/bin/linux/arm64/kubectl"
+
+    - path: /usr/local/bin/kubelet
+      mode: 0755
+      contents:
+        source: "https://dl.k8s.io/release/v${K8S_VERSION}/bin/linux/arm64/kubelet"
+
+    - path: /var/lib/kubelet/config.yaml
       mode: 0644
       contents:
         inline: |
-          apiVersion: kubeadm.k8s.io/v1beta4
-          kind: JoinConfiguration
-          discovery:
-            bootstrapToken:
-              token: "${JOIN_TOKEN}"
-              apiServerEndpoint: "cluster-endpoint:6443"
-              caCertHashes:
-                - "${DISCOVERY_HASH}"
-          controlPlane:
-            certificateKey: "${CERT_KEY}"
-            localAPIEndpoint:
-              advertiseAddress: "{{ .NetworkConfig.AdvertiseAddress }}"
-              bindPort: 6443
-          nodeRegistration:
-            criSocket: unix:///var/run/containerd/containerd.sock
+          apiVersion: kubelet.config.k8s.io/v1beta1
+          kind: KubeletConfiguration
+          volumePluginDir: /var/lib/kubelet/kubelet-plugins/volume/exec
 
-    # 2) systemd unit: kubeadm join --control-plane
-    - path: /etc/systemd/system/kubeadm-join.service
+    # ───────── Containerd 설정 ─────────
+    - path: /etc/containerd/config.toml
       mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          version = 2
+          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+            runtime_type = "io.containerd.runc.v2"
+
+    # ───────── br_netfilter & sysctl ─────────
+    - path: /etc/modules-load.d/br_netfilter.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: br_netfilter
+
+    - path: /etc/sysctl.d/kubernetes.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          net.bridge.bridge-nf-call-iptables=1
+          net.ipv4.ip_forward=1
+
+    - path: /etc/systemd/system/install-cni-plugins.service
       contents:
         inline: |
           [Unit]
-          Description=Join this node to the existing control plane
-          Wants=containerd.service network-online.target
-          After=containerd.service containerd.socket network-online.target
+          Description=Install CNI plugins
+          After=network-online.target
+          Wants=network-online.target
 
           [Service]
           Type=oneshot
+          ExecStartPre=/usr/bin/mkdir -p /opt/cni/bin
+          
+          ExecStart=/usr/bin/bash -c '\
+            curl -L https://github.com/containernetworking/plugins/releases/download/v1.7.1/cni-plugins-linux-arm64-v1.7.1.tgz \
+              | tar -C /opt/cni/bin -xz'
           RemainAfterExit=yes
-          Environment="KUBECONFIG=/etc/kubernetes/admin.conf"
-          # containerd 준비 대기
-          ExecStartPre=/usr/bin/bash -c 'until [ -S /var/run/containerd/containerd.sock ] && ctr version &>/dev/null; do sleep 1; done'
-          ExecStart=/usr/local/bin/kubeadm join \
-            --config=/etc/kubeadm-join-config.yaml \
-            --ignore-preflight-errors=all
-          StandardOutput=journal+console
-          StandardError=journal+console
 
           [Install]
           WantedBy=multi-user.target
 
+    # ───────── Zincati config ─────────
+    - path: /etc/zincati/config.d/auto-reboot-window.toml
+      mode: 0644
+      contents:
+        inline: |
+          [updates]
+          strategy = "periodic"
+          
+          [updates.periodic]
+          time_zone = "${ZINCATI_TIMEZONE}"
+
+          [[updates.periodic.window]]
+          days           = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]
+          start_time     = "${ZINCATI_START}"
+          length_minutes = ${ZINCATI_LENGTH}
+
 systemd:
-  units:
-    # containerd/kubelet 활성화(첫 마스터와 동일)
-    - name: containerd.service
-      enabled: true
-    - name: kubelet.service
+  units:        
+    # A) NetworkManager, WireGuard 활성화
+    - name: NetworkManager.service
       enabled: true
 
-    # kubeadm-join 서비스 활성화
+    - name: wg-quick@wg0.service
+      enabled: true
+
+    # B) containerd, kubelet 서비스 활성화
+    - name: containerd.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=containerd container runtime
+        Documentation=https://containerd.io
+        After=network-online.target NetworkManager-wait-online.service
+
+        [Service]
+        User=root
+        ExecStart=/usr/bin/containerd
+        Restart=on-failure
+        RestartSec=5
+
+        [Install]
+        WantedBy=multi-user.target
+
+    - name: kubelet.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=kubelet: The Kubernetes Node Agent
+        Documentation=https://kubernetes.io/docs/home/
+        After=containerd.service network-online.target
+        Requires=containerd.service network-online.target
+
+        [Service]
+        User=root
+        ExecStart=
+        ExecStart=/usr/local/bin/kubelet \
+          --config=/var/lib/kubelet/config.yaml \
+          --kubeconfig=/etc/kubernetes/kubelet.conf 
+          
+        Restart=on-failure
+        StartLimitInterval=0
+        RestartSec=10
+
+        [Install]
+        WantedBy=multi-user.target
+
+    # C) kubeadm join 서비스 (2 번째 이후 마스터 용)
     - name: kubeadm-join.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Join HA Control Plane (additional master)
+        Requires=containerd.service
+        After=containerd.service containerd.socket kubelet.service network-online.target
+
+        # 이미 kube-scheduler 정적 매니페스트가 있으면(=이미 컨트롤플레인에 합류했으면) 실행하지 않음
+        ConditionPathExists=!/etc/kubernetes/manifests/kube-scheduler.yaml
+
+        [Service]
+        Type=oneshot
+        ExecStartPre=/usr/bin/bash -c '\
+          until [ -S /var/run/containerd/containerd.sock ] && ctr version &>/dev/null; do sleep 1; done'
+        ExecStart=/usr/bin/env bash -c 'exec ${kubeadm_join_command} --node-name master-${TIMESTAMP_NODE_NAME}'
+        ExecStartPost=/bin/mkdir -p /home/core/.kube
+        ExecStartPost=/bin/cp -i /etc/kubernetes/admin.conf /home/core/.kube/config
+        ExecStartPost=/bin/chown -R core:core /home/core/.kube
+
+        RemainAfterExit=true
+
+        [Install]
+        WantedBy=multi-user.target
+
+    - name: install-cni-plugins.service
+      enabled: true
+
+    # E) SSHD 활성화 (선택)
+    - name: sshd.service
       enabled: true
 
 passwd:
   users:
     - name: core
+      uid: 1000
       ssh_authorized_keys:
         - $SSH_PUB_KEY

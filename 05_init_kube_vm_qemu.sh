@@ -64,6 +64,18 @@ select vm_mode in "kube_first_main" "kube_other_main" "kube_worker"; do
         ignition_url="http://localhost:8000/k8s_ignition_other_main.yml"
         memory_size="4096"
         num_cpus="4"
+
+        join_file=$(mktemp)
+        ./u_kubeadm_join_command.sh "$join_file"
+        if [ ! -s "$join_file" ]; then
+            echo "❌ Error: failed to generate kubeadm join command" >&2
+            exit 1
+        fi
+
+        export kubeadm_join_command="$(<"$join_file")"
+        rm -f "$join_file"
+        echo "kubeadm join command set for other_main:"
+        echo "$kubeadm_join_command"
         break
         ;;
     kube_worker)
@@ -200,6 +212,8 @@ echo "Zincati reboot window length: $ZINCATI_LENGTH"
 
 echo "Generating ignition file from template..."
 
+export TIMESTAMP_NODE_NAME=$(date +%Y%m%d%H%M%S)
+echo "Timestamp node name: $TIMESTAMP_NODE_NAME"
 envsubst < $ignition_template_path > $ignition_bu_path
 
 ignition_path="$temp_dir/$vm_name/ignition.ign"
@@ -271,9 +285,9 @@ if [[ "$vm_mode" =~ ^kube_.*_main$ ]]; then
   touch "$MAIN_ADDRESSES_FILE"
   cat "$WG_IP_ADDRESS" >> "$MAIN_ADDRESSES_FILE"
   echo "[INFO] Added $WG_IP_ADDRESS to $MAIN_ADDRESSES_FILE"
-  ./UT_renew_loadbalancer.sh
+  ./u_renew_loadbalancer.sh
   echo "[INFO] Load balancer updated with new main address."
 fi
 
 echo "Run the VM with the following command: $vm_dir/start_vm.sh"
-echo "or use ./start_vm_machine.sh to start the VM."
+echo "or use ./u_start_vm_machine.sh to start the VM."
