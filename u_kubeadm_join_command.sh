@@ -4,7 +4,7 @@ set -euo pipefail
 
 output_file="${1:-}"
 
-echo "kubeadm join 명령어를 자동으로 출력합니다."
+echo "kubeadm join 명령어 조회"
 
 # 환경 설정 파일 로드 (PRECONFIGURED_VM_IP_START 등)
 source ./preconfigured.sh

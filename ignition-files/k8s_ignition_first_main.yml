@@ -9,6 +9,11 @@ storage:
       mode: 0700
 
   files:
+    - path: /etc/hostname
+      mode: 0644
+      contents:
+        inline: master-${TIMESTAMP_NODE_NAME}.cluster.local
+
     - path: /etc/hosts
       mode: 0644
       overwrite: false
@@ -73,18 +78,18 @@ storage:
           apiVersion: kubeadm.k8s.io/v1beta4
           kind: InitConfiguration
           nodeRegistration:
-            name: master-${TIMESTAMP_NODE_NAME}
             criSocket: unix:///var/run/containerd/containerd.sock
             kubeletExtraArgs:
               - name: volume-plugin-dir
                 value: /var/lib/kubelet/kubelet-plugins/volume/exec
+          certificateKey: "${KUBEADM_CERT_KEY}"
 
           ---
           apiVersion: kubeadm.k8s.io/v1beta4
           kind: ClusterConfiguration
           certificatesDir: /etc/kubernetes/pki
           kubernetesVersion: v${K8S_VERSION}
-          controlPlaneEndpoint: cluster-endpoint:6443
+          controlPlaneEndpoint: cluster-endpoint:${CLUSTER_PORT}
           networking:
             podSubnet: "${POD_NETWORK_CIDR}"
           apiServer:
@@ -170,8 +175,8 @@ storage:
           RestartSec=5s
           Environment="KUBECONFIG=/etc/kubernetes/admin.conf"
 
-          ExecStartPre=/usr/bin/bash -c 'until curl -k -sSf https://cluster-endpoint:6443/healthz >/dev/null; do sleep 1; done'
-          ExecStartPre=/usr/bin/bash -c 'until curl -k -sSf https://cluster-endpoint:6443/readyz >/dev/null; do sleep 1; done'
+          ExecStartPre=/usr/bin/bash -c 'until curl -k -sSf https://cluster-endpoint:${CLUSTER_PORT}/healthz >/dev/null; do sleep 1; done'
+          ExecStartPre=/usr/bin/bash -c 'until curl -k -sSf https://cluster-endpoint:${CLUSTER_PORT}/readyz >/dev/null; do sleep 1; done'
           ExecStartPre=/usr/bin/bash -c '\
             until kubectl --kubeconfig=/etc/kubernetes/admin.conf get --raw /openapi/v2 >/dev/null 2>&1; \
             do sleep 1; done'

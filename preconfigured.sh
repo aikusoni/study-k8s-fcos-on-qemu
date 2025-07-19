@@ -20,6 +20,8 @@ export PODMAN_MACHINE_NAME="podman-machine-default"
 
 export CLUSTER_NAME="my-k8s-cluster"
 
+export KUBEADM_CERT_KEY_PATH=".keys/kubeadm-cert-key.txt"
+
 # to use flannel as the CNI plugin
 export POD_NETWORK_CIDR=10.244.0.0/16
 

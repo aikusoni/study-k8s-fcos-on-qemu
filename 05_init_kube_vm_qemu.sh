@@ -58,6 +58,15 @@ select vm_mode in "kube_first_main" "kube_other_main" "kube_worker"; do
         ignition_url="http://localhost:8000/k8s_ignition_first_main.yml"
         memory_size="4096"
         num_cpus="4"
+        
+        if [ ! -f "$KUBEADM_CERT_KEY_PATH" ]; then
+            export INIT_CERT_KEY=$(openssl rand -hex 32)
+            mkdir -p "$(dirname "$KUBEADM_CERT_KEY_PATH")"
+            echo "$INIT_CERT_KEY" > "$KUBEADM_CERT_KEY_PATH"
+        else
+            export INIT_CERT_KEY=$(cat "$KUBEADM_CERT_KEY_PATH")
+        fi
+
         break
         ;;
     kube_other_main)
@@ -65,17 +74,23 @@ select vm_mode in "kube_first_main" "kube_other_main" "kube_worker"; do
         memory_size="4096"
         num_cpus="4"
 
-        join_file=$(mktemp)
-        ./u_kubeadm_join_command.sh "$join_file"
-        if [ ! -s "$join_file" ]; then
-            echo "❌ Error: failed to generate kubeadm join command" >&2
+        token_tmpfs="$(mktemp)"
+        ./u_kubeadm_token.sh "$token_tmpfs"
+        if [ ! -s "$token_tmpfs" ]; then
+            echo "❌ Error: failed to generate kubeadm token" >&2
             exit 1
         fi
+        export KUBEADM_TOKEN="$(<"$token_tmpfs")"
+        rm "$token_tmpfs"
 
-        export kubeadm_join_command="$(<"$join_file")"
-        rm -f "$join_file"
-        echo "kubeadm join command set for other_main:"
-        echo "$kubeadm_join_command"
+        hash_tmpfs="$(mktemp)"
+        ./u_kubeadm_hash.sh "$hash_tmpfs"
+        if [ ! -s "$hash_tmpfs" ]; then
+            echo "❌ Error: failed to generate kubeadm hash" >&2
+            exit 1
+        fi
+        export KUBEADM_HASH="$(<"$hash_tmpfs")"
+        rm "$hash_tmpfs"
         break
         ;;
     kube_worker)
@@ -110,7 +125,7 @@ echo "Selected wireguard client no: $pad_wireguard_client_no"
 
 SOURCE_WG_FILE=./wireguard-client-config/wireguard-vpn/${pad_wireguard_client_no}/wg0.conf
 USING_WG_MARK_FILE=./wireguard-client-config/wireguard-vpn/${pad_wireguard_client_no}/using.lock
-WG_IP_ADDRESS=./wireguard-client-config/wireguard-vpn/${pad_wireguard_client_no}/wg_ip_address.txt
+export WG_IP_ADDRESS=$(cat ./wireguard-client-config/wireguard-vpn/${pad_wireguard_client_no}/wg_ip_address.txt)
 
 if [ ! -f $SOURCE_WG_FILE ]; then
     echo "Error: Wireguard configuration file not found: $SOURCE_WG_FILE"
@@ -283,10 +298,11 @@ chmod +x $vm_dir/start_vm.sh
 if [[ "$vm_mode" =~ ^kube_.*_main$ ]]; then
   mkdir -p $LOADBALANCER_CONF_DIR
   touch "$MAIN_ADDRESSES_FILE"
-  cat "$WG_IP_ADDRESS" >> "$MAIN_ADDRESSES_FILE"
+  echo "$WG_IP_ADDRESS" >> "$MAIN_ADDRESSES_FILE"
   echo "[INFO] Added $WG_IP_ADDRESS to $MAIN_ADDRESSES_FILE"
-  ./u_renew_loadbalancer.sh
-  echo "[INFO] Load balancer updated with new main address."
+  echo "[INFO] Load balancer updated with new main address. Run ./u_renew_loadbalancer.sh to apply changes."
+else
+  echo "[INFO] This is a worker node, no need to update load balancer."
 fi
 
 echo "Run the VM with the following command: $vm_dir/start_vm.sh"

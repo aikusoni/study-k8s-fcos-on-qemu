@@ -9,6 +9,11 @@ storage:
       mode: 0700
 
   files:
+    - path: /etc/hostname
+      mode: 0644
+      contents:
+        inline: master-${TIMESTAMP_NODE_NAME}.cluster.local
+
     - path: /etc/hosts
       mode: 0644
       overwrite: false
@@ -64,6 +69,36 @@ storage:
         inline: |
           apiVersion: kubelet.config.k8s.io/v1beta1
           kind: KubeletConfiguration
+          volumePluginDir: /var/lib/kubelet/kubelet-plugins/volume/exec
+
+    - path: /etc/join-config.yaml
+      mode: 0644
+      contents:
+        inline: |
+          apiVersion: kubeadm.k8s.io/v1beta4
+          kind: JoinConfiguration
+          discovery:
+            bootstrapToken:
+              apiServerEndpoint: cluster-endpoint:${CLUSTER_PORT}
+              token: ${KUBEADM_TOKEN}
+              caCertHashes:
+                - ${KUBEADM_HASH}
+          nodeRegistration:
+            criSocket: unix:///var/run/containerd/containerd.sock
+            kubeletExtraArgs:
+              - name: volume-plugin-dir
+                value: /var/lib/kubelet/kubelet-plugins/volume/exec
+          controlPlane:
+            localAPIEndpoint:
+              advertiseAddress: ${WG_IP_ADDRESS}
+              bindPort: ${CLUSTER_PORT}
+          certificateKey: "${KUBEADM_CERT_KEY}"
+          
+          ---
+          apiVersion: kubelet.config.k8s.io/v1beta1
+          kind: KubeletConfiguration
+          # kubelet specific options here
+          
           volumePluginDir: /var/lib/kubelet/kubelet-plugins/volume/exec
 
     # ───────── Containerd 설정 ─────────
@@ -167,6 +202,7 @@ systemd:
         User=root
         ExecStart=
         ExecStart=/usr/local/bin/kubelet \
+          --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf \
           --config=/var/lib/kubelet/config.yaml \
           --kubeconfig=/etc/kubernetes/kubelet.conf 
           
@@ -193,9 +229,8 @@ systemd:
         Type=oneshot
         ExecStartPre=/usr/bin/bash -c '\
           until [ -S /var/run/containerd/containerd.sock ] && ctr version &>/dev/null; do sleep 1; done'
-        ExecStart=/usr/bin/env bash -c 'exec ${kubeadm_join_command} --node-name master-${TIMESTAMP_NODE_NAME}'
+        ExecStart=/usr/bin/env bash -c 'exec kubeadm join --config /etc/join-config.yaml'
         ExecStartPost=/bin/mkdir -p /home/core/.kube
-        ExecStartPost=/bin/cp -i /etc/kubernetes/admin.conf /home/core/.kube/config
         ExecStartPost=/bin/chown -R core:core /home/core/.kube
 
         RemainAfterExit=true

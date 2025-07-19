@@ -3,6 +3,7 @@
 /temp
 /wireguard-client-config
 /keys
+/.keys
 /.ssh
 /.logs
 /.loadbalancer
