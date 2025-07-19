@@ -50,6 +50,14 @@ else
     done
 fi
 
+if [ ! -f "$KUBEADM_CERT_KEY_PATH" ]; then
+    export INIT_CERT_KEY=$(openssl rand -hex 32)
+    mkdir -p "$(dirname "$KUBEADM_CERT_KEY_PATH")"
+    echo "$INIT_CERT_KEY" > "$KUBEADM_CERT_KEY_PATH"
+else
+    export INIT_CERT_KEY=$(cat "$KUBEADM_CERT_KEY_PATH")
+fi
+
 # VM 모드 입력 및 Ignition URL 설정
 echo "Available modes: "
 select vm_mode in "kube_first_main" "kube_other_main" "kube_worker"; do
@@ -58,14 +66,6 @@ select vm_mode in "kube_first_main" "kube_other_main" "kube_worker"; do
         ignition_url="http://localhost:8000/k8s_ignition_first_main.yml"
         memory_size="4096"
         num_cpus="4"
-        
-        if [ ! -f "$KUBEADM_CERT_KEY_PATH" ]; then
-            export INIT_CERT_KEY=$(openssl rand -hex 32)
-            mkdir -p "$(dirname "$KUBEADM_CERT_KEY_PATH")"
-            echo "$INIT_CERT_KEY" > "$KUBEADM_CERT_KEY_PATH"
-        else
-            export INIT_CERT_KEY=$(cat "$KUBEADM_CERT_KEY_PATH")
-        fi
 
         break
         ;;
