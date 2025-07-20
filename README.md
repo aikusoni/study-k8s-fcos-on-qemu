@@ -1,52 +1,48 @@
-# Run k8s cluster on local machine
+# Run a Kubernetes Cluster Locally
 
 ## Overview
-- This is my study project to run k8s cluster on my local machine.
+This is a study project to run a Kubernetes cluster on my local machine.
 
 ## Test Environment
-- Host Machine : MacBook Pro (Apple M3 Max)
-- QEMU : QEMU emulator version 9.2.0
-- FCOS Image : fedora-coreos-42.20250623.3.1-qemu.aarch64.qcow2
-- Podman Version : 5.5.2
+- **Host:** MacBook Pro (Apple M3 Max)  
+- **QEMU:** 9.2.0  
+- **FCOS Image:** fedora-coreos-42.20250623.3.1-qemu.aarch64.qcow2  
+- **Podman:** 5.5.2  
 
-## File structure
-- ./ignition-files : fcos ignition files for k8s control plane and worker node.
-- ./images : FCOS image files (It is not included in this repository).
+## File Structure
+- `./ignition-files` — Ignition configs for control-plane and worker nodes  
+- `./images` — FCOS QCOW2 images (not included in this repo)  
 
 ## Running Sequence
-```sh
-# Run podman machine.
+
+```bash
+# 1. Start the Podman VM
 ./00_run_podman_machine.sh
 
-# Run wireguard container onto podman.
+# 2. Launch the WireGuard container
 ./01_run_podman_wg.sh
 
-# Connect to the wireguard container to communicate with k8s node Virtual Machine in host machine.
-./02_conenct_wg.sh
+# 3. Connect your shell to the WireGuard network
+./02_connect_wg.sh
 
-# Run haproxy for clustering.
+# 4. Start the HAProxy load-balancer
 ./03_run_cluster_load_balancer.sh
 
-# Run ignition distribution servers on host machine to initialize fcos.
-./04_ignition_server.sh 
-# or execute 'nohup ./04_ignition_server.sh &' to avoid blocking the terminal.
+# 5. Serve Ignition configs
+./04_ignition_server.sh
+# (or run in background: `nohup ./04_ignition_server.sh &`)
 
-# Initialize fcos on qemu.
-# This script make vm image and run qemu with fcos.
+# 6. Initialize Fedora CoreOS VM with Ignition
+#    (Repeat this for each control-plane or worker node you want to add)
 ./05_init_kube_vm_qemu.sh
 
-# Run VM via below scripts.
+# 7. Boot the VM
+#    (Run again to start each node)
 ./u_start_vm.sh
-
-# Use the script below to launch a shell for running kubectl on the host
-# (while the Kubernetes control plane is running in a QEMU VM)
-./u_enter_kubectl_shell.sh
 ```
 
-## Roadmap
-- ✅ Initialize wireguard vpn server on host machine.
-    - The project uses podman to run wireguard vpn server.
-- ✅ Initialize fedora core os on qemu.
-- ✅ Connecting fedora core os to wireguard vpn.
-- ✅ Initialize k8s control plane.
-- ✅ Initialize k8s worker node.
+## Kubectl On Host Machine
+```sh
+# Enter a shell pre-configured for kubectl
+./u_enter_kubectl_shell.sh
+```
