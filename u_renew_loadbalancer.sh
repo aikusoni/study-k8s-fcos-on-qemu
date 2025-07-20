@@ -31,7 +31,7 @@ defaults
 # frontend for Kubernetes API server
 ############################################
 frontend kubernetes_api
-    bind *:${CLUSTER_PORT}
+    bind *:${API_SERVER_PORT}
     default_backend k8s_masters
 
 ############################################
@@ -54,14 +54,14 @@ frontend etcd_peer
 backend k8s_masters
     balance     roundrobin
     option      tcp-check
-    tcp-check   connect port ${CLUSTER_PORT}
+    tcp-check   connect port ${API_SERVER_PORT}
 EOF
 
 # append each master address into k8s_masters
 if [ -f "$MAIN_ADDRESSES_FILE" ]; then
   idx=0
   while read -r ip; do
-    echo "    server master${idx} ${ip}:${CLUSTER_PORT} check inter 5s fall 2 rise 3" \
+    echo "    server master${idx} ${ip}:${API_SERVER_PORT} check inter 5s fall 2 rise 3" \
       >> "$HAPROXY_PATH"
     idx=$((idx + 1))
   done < "$MAIN_ADDRESSES_FILE"
@@ -131,7 +131,7 @@ listen stats
 EOF
 
 REQUIRED_PORTS=( \
-  "${CLUSTER_PORT}" \
+  "${API_SERVER_PORT}" \
   "${ETCD_CLIENT_PORT}" \
   "${ETCD_PEER_PORT}" \
   "9000" \
@@ -161,7 +161,7 @@ if ! podman ps -a --format '{{.Names}}' | grep -qw haproxy; then
   echo "[INFO] Creating HAProxy container (paused)..."
   podman create \
     --name haproxy \
-    -p ${CLUSTER_PORT}:${CLUSTER_PORT} \
+    -p ${API_SERVER_PORT}:${API_SERVER_PORT} \
     -p ${ETCD_CLIENT_PORT}:${ETCD_CLIENT_PORT} \
     -p ${ETCD_PEER_PORT}:${ETCD_PEER_PORT} \
     -p 9000:9000 \

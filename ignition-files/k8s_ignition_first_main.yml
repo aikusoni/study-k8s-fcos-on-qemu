@@ -84,12 +84,16 @@ storage:
                 value: /var/lib/kubelet/kubelet-plugins/volume/exec
           certificateKey: "${INIT_CERT_KEY}"
 
+          localAPIEndpoint:
+            advertiseAddress: "${WG_IP_ADDRESS}"
+            bindPort: ${API_SERVER_PORT}
+
           ---
           apiVersion: kubeadm.k8s.io/v1beta4
           kind: ClusterConfiguration
           certificatesDir: /etc/kubernetes/pki
           kubernetesVersion: v${K8S_VERSION}
-          controlPlaneEndpoint: cluster-endpoint:${CLUSTER_PORT}
+          controlPlaneEndpoint: cluster-endpoint:${API_SERVER_PORT}
           networking:
             podSubnet: "${POD_NETWORK_CIDR}"
           apiServer:
@@ -97,6 +101,8 @@ storage:
               - "cluster-endpoint"
               - "127.0.0.1"
               - "localhost"
+              - "${WG_IP_ADDRESS}"
+              - "${CLUSTER_LOAD_BALANCER_END_POINT}"
           controllerManager:
             extraVolumes:
               - name: flexvolume-dir
@@ -112,9 +118,9 @@ storage:
                 - name: listen-peer-urls
                   value: "https://0.0.0.0:${ETCD_PEER_PORT}"
                 - name: advertise-client-urls
-                  value: "https://cluster-endpoint:${ETCD_CLIENT_PORT},https://{WG_IP_ADDRESS}:${ETCD_CLIENT_PORT}"
+                  value: "https://${CLUSTER_LOAD_BALANCER_END_POINT}:${ETCD_CLIENT_PORT},https://${WG_IP_ADDRESS}:${ETCD_CLIENT_PORT}"
                 - name: initial-advertise-peer-urls
-                  value: "https://cluster-endpoint:${ETCD_PEER_PORT},https://{WG_IP_ADDRESS}:${ETCD_PEER_PORT}"
+                  value: "https://${WG_IP_ADDRESS}:${ETCD_PEER_PORT}"
 
           ---
           apiVersion: kubelet.config.k8s.io/v1beta1
@@ -186,8 +192,8 @@ storage:
           RestartSec=5s
           Environment="KUBECONFIG=/etc/kubernetes/admin.conf"
 
-          ExecStartPre=/usr/bin/bash -c 'until curl -k -sSf https://cluster-endpoint:${CLUSTER_PORT}/healthz >/dev/null; do sleep 1; done'
-          ExecStartPre=/usr/bin/bash -c 'until curl -k -sSf https://cluster-endpoint:${CLUSTER_PORT}/readyz >/dev/null; do sleep 1; done'
+          ExecStartPre=/usr/bin/bash -c 'until curl -k -sSf https://cluster-endpoint:${API_SERVER_PORT}/healthz >/dev/null; do sleep 1; done'
+          ExecStartPre=/usr/bin/bash -c 'until curl -k -sSf https://cluster-endpoint:${API_SERVER_PORT}/readyz >/dev/null; do sleep 1; done'
           ExecStartPre=/usr/bin/bash -c '\
             until kubectl --kubeconfig=/etc/kubernetes/admin.conf get --raw /openapi/v2 >/dev/null 2>&1; \
             do sleep 1; done'

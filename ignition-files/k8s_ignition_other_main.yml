@@ -79,7 +79,7 @@ storage:
           kind: JoinConfiguration
           discovery:
             bootstrapToken:
-              apiServerEndpoint: cluster-endpoint:${CLUSTER_PORT}
+              apiServerEndpoint: cluster-endpoint:${API_SERVER_PORT}
               token: ${KUBEADM_TOKEN}
               caCertHashes:
                 - ${KUBEADM_HASH}
@@ -91,7 +91,7 @@ storage:
           controlPlane:
             localAPIEndpoint:
               advertiseAddress: ${WG_IP_ADDRESS}
-              bindPort: ${CLUSTER_PORT}
+              bindPort: ${API_SERVER_PORT}
             certificateKey: "${INIT_CERT_KEY}"
           
           ---
