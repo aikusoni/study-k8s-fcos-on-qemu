@@ -37,6 +37,10 @@
 
 # Run VM via below scripts.
 ./u_start_vm.sh
+
+# Use the script below to launch a shell for running kubectl on the host
+# (while the Kubernetes control plane is running in a QEMU VM)
+./u_enter_kubectl_shell.sh
 ```
 
 ## Roadmap
@@ -44,5 +48,5 @@
     - The project uses podman to run wireguard vpn server.
 - ✅ Initialize fedora core os on qemu.
 - ✅ Connecting fedora core os to wireguard vpn.
-- 🚧 Initialize k8s control plane.
-- 🚧 Initialize k8s worker node.
+- ✅ Initialize k8s control plane.
+- ✅ Initialize k8s worker node.
