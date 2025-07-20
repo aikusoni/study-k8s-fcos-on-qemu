@@ -99,6 +99,24 @@ select vm_mode in "kube_first_main" "kube_other_main" "kube_worker"; do
         ignition_url="http://localhost:8000/k8s_ignition_worker.yml"
         memory_size="2048"
         num_cpus="2"
+
+        token_tmpfs="$(mktemp)"
+        ./u_kubeadm_token.sh "$token_tmpfs"
+        if [ ! -s "$token_tmpfs" ]; then
+            echo "❌ Error: failed to generate kubeadm token" >&2
+            exit 1
+        fi
+        export KUBEADM_TOKEN="$(<"$token_tmpfs")"
+        rm "$token_tmpfs"
+
+        hash_tmpfs="$(mktemp)"
+        ./u_kubeadm_hash.sh "$hash_tmpfs"
+        if [ ! -s "$hash_tmpfs" ]; then
+            echo "❌ Error: failed to generate kubeadm hash" >&2
+            exit 1
+        fi
+        export KUBEADM_HASH="$(<"$hash_tmpfs")"
+        rm "$hash_tmpfs"
         break
         ;;
     *)
