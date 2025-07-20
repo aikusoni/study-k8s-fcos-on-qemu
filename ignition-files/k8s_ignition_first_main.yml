@@ -120,10 +120,12 @@ storage:
                 - "localhost"
                 - "${WG_IP_ADDRESS}"
                 - "*.master.cluster.local"
+                - "${CLUSTER_LOAD_BALANCER_END_POINT}"
               peerCertSANs:
                 - "cluster-endpoint"
                 - "${WG_IP_ADDRESS}"
                 - "*.master.cluster.local"
+                - "${CLUSTER_LOAD_BALANCER_END_POINT}"
               extraArgs:
                 - name: listen-client-urls
                   value: "https://0.0.0.0:${ETCD_CLIENT_PORT}"
