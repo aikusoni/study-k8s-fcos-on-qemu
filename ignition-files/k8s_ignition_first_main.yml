@@ -12,7 +12,7 @@ storage:
     - path: /etc/hostname
       mode: 0644
       contents:
-        inline: master-${TIMESTAMP_NODE_NAME}.cluster.local
+        inline: ${TIMESTAMP_NODE_NAME}.master.cluster.local
 
     - path: /etc/hosts
       mode: 0644
@@ -103,6 +103,8 @@ storage:
               - "localhost"
               - "${WG_IP_ADDRESS}"
               - "${CLUSTER_LOAD_BALANCER_END_POINT}"
+              - "*.master.cluster.local"
+              - "*.cluster.local"
           controllerManager:
             extraVolumes:
               - name: flexvolume-dir
@@ -112,6 +114,16 @@ storage:
                 pathType: DirectoryOrCreate
           etcd:
             local:
+              serverCertSANs:
+                - "cluster-endpoint"
+                - "127.0.0.1"
+                - "localhost"
+                - "${WG_IP_ADDRESS}"
+                - "*.master.cluster.local"
+              peerCertSANs:
+                - "cluster-endpoint"
+                - "${WG_IP_ADDRESS}"
+                - "*.master.cluster.local"
               extraArgs:
                 - name: listen-client-urls
                   value: "https://0.0.0.0:${ETCD_CLIENT_PORT}"

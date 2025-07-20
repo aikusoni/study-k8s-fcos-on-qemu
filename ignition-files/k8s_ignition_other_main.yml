@@ -12,7 +12,7 @@ storage:
     - path: /etc/hostname
       mode: 0644
       contents:
-        inline: master-${TIMESTAMP_NODE_NAME}.cluster.local
+        inline: ${TIMESTAMP_NODE_NAME}.master.cluster.local
 
     - path: /etc/hosts
       mode: 0644
