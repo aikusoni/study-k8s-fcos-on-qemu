@@ -303,6 +303,7 @@ if [[ "$vm_mode" =~ ^kube_.*_main$ ]]; then
   echo "$WG_IP_ADDRESS" >> "$MAIN_ADDRESSES_FILE"
   echo "[INFO] Added $WG_IP_ADDRESS to $MAIN_ADDRESSES_FILE"
   echo "[INFO] Load balancer updated with new main address. Run ./u_renew_loadbalancer.sh to apply changes."
+  ./u_renew_loadbalancer.sh
 else
   echo "[INFO] This is a worker node, no need to update load balancer."
 fi

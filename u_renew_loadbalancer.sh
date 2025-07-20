@@ -35,7 +35,21 @@ frontend kubernetes_api
     default_backend k8s_masters
 
 ############################################
-# backend pool of master nodes (auto from main-addresses.txt)
+# frontend for etcd client connections
+############################################
+frontend etcd_client
+    bind *:${ETCD_CLIENT_PORT}
+    default_backend etcd_clients
+
+############################################
+# frontend for etcd peer communications
+############################################
+frontend etcd_peer
+    bind *:${ETCD_PEER_PORT}
+    default_backend etcd_peers
+
+############################################
+# backend pool of master nodes for API server
 ############################################
 backend k8s_masters
     balance     roundrobin
@@ -43,19 +57,66 @@ backend k8s_masters
     tcp-check   connect port ${CLUSTER_PORT}
 EOF
 
-# append each master address if main-addresses.txt exists
+# append each master address into k8s_masters
 if [ -f "$MAIN_ADDRESSES_FILE" ]; then
   idx=0
   while read -r ip; do
-    echo "    server master${idx} ${ip}:${CLUSTER_PORT} check inter 5s fall 2 rise 3" >> "$HAPROXY_PATH"
+    echo "    server master${idx} ${ip}:${CLUSTER_PORT} check inter 5s fall 2 rise 3" \
+      >> "$HAPROXY_PATH"
     idx=$((idx + 1))
   done < "$MAIN_ADDRESSES_FILE"
 else
-  echo "[INFO] "$MAIN_ADDRESSES_FILE" not found, skipping backend entries"
+  echo "[INFO] \"$MAIN_ADDRESSES_FILE\" not found, skipping API backends"
+fi
+
+# etcd client backend
+cat << EOF >> "$HAPROXY_PATH"
+
+############################################
+# backend pool of master nodes for etcd client
+############################################
+backend etcd_clients
+    balance     roundrobin
+    option      tcp-check
+    tcp-check   connect port ${ETCD_CLIENT_PORT}
+EOF
+
+if [ -f "$MAIN_ADDRESSES_FILE" ]; then
+  idx=0
+  while read -r ip; do
+    echo "    server master${idx} ${ip}:${ETCD_CLIENT_PORT} check inter 5s fall 2 rise 3" \
+      >> "$HAPROXY_PATH"
+    idx=$((idx + 1))
+  done < "$MAIN_ADDRESSES_FILE"
+else
+  echo "[INFO] \"$MAIN_ADDRESSES_FILE\" not found, skipping etcd client backends"
+fi
+
+# etcd peer backend
+cat << EOF >> "$HAPROXY_PATH"
+
+############################################
+# backend pool of master nodes for etcd peer
+############################################
+backend etcd_peers
+    balance     roundrobin
+    option      tcp-check
+    tcp-check   connect port ${ETCD_PEER_PORT}
+EOF
+
+if [ -f "$MAIN_ADDRESSES_FILE" ]; then
+  idx=0
+  while read -r ip; do
+    echo "    server master${idx} ${ip}:${ETCD_PEER_PORT} check inter 5s fall 2 rise 3" \
+      >> "$HAPROXY_PATH"
+    idx=$((idx + 1))
+  done < "$MAIN_ADDRESSES_FILE"
+else
+  echo "[INFO] \"$MAIN_ADDRESSES_FILE\" not found, skipping etcd peer backends"
 fi
 
 # optional stats section (unchanged)
-cat << EOF >> "$HAPROXY_PATH" 
+cat << EOF >> "$HAPROXY_PATH"
 
 ############################################
 # optional: HAProxy 통계 페이지
@@ -69,12 +130,40 @@ listen stats
     stats auth ${HAPROXY_STAT_USER}:${HAPROXY_STAT_PASSWORD}
 EOF
 
+REQUIRED_PORTS=( \
+  "${CLUSTER_PORT}" \
+  "${ETCD_CLIENT_PORT}" \
+  "${ETCD_PEER_PORT}" \
+  "9000" \
+)
+
+# helper: check if haproxy container has a given host port bound
+container_has_port() {
+  local port="$1"
+  podman inspect haproxy \
+    --format '{{range $k,$v := .HostConfig.PortBindings}}{{$k}} {{end}}' \
+    | grep -qw "${port}/tcp"
+}
+
+# if container exists, verify all REQUIRED_PORTS are present
+if podman container exists haproxy; then
+  for p in "${REQUIRED_PORTS[@]}"; do
+    if ! container_has_port "$p"; then
+      echo "[INFO] Port $p not found in existing haproxy container; recreating it"
+      podman rm -f haproxy
+      break
+    fi
+  done
+fi
+
 # Ensure HAProxy container exists
 if ! podman ps -a --format '{{.Names}}' | grep -qw haproxy; then
   echo "[INFO] Creating HAProxy container (paused)..."
   podman create \
     --name haproxy \
     -p ${CLUSTER_PORT}:${CLUSTER_PORT} \
+    -p ${ETCD_CLIENT_PORT}:${ETCD_CLIENT_PORT} \
+    -p ${ETCD_PEER_PORT}:${ETCD_PEER_PORT} \
     -p 9000:9000 \
     haproxy:latest
 fi
@@ -91,8 +180,6 @@ else
   echo "[INFO] Reloading HAProxy with HUP..."
   podman kill --signal HUP haproxy
 fi
-
-
 
 # Test and reload HAProxy
 podman exec haproxy haproxy -f /usr/local/etc/haproxy/haproxy.cfg -c || {

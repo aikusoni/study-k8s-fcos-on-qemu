@@ -1,4 +1,4 @@
-# ignition_first_master_envsubst.yaml
+# k8s_ignition_first_main.yml
 variant: fcos
 version: 1.6.0
 
@@ -104,7 +104,18 @@ storage:
                 mountPath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
                 readOnly: false
                 pathType: DirectoryOrCreate
-          
+          etcd:
+            local:
+              extraArgs:
+                - name: listen-client-urls
+                  value: "https://0.0.0.0:${ETCD_CLIENT_PORT}"
+                - name: listen-peer-urls
+                  value: "https://0.0.0.0:${ETCD_PEER_PORT}"
+                - name: advertise-client-urls
+                  value: "https://cluster-endpoint:${ETCD_CLIENT_PORT},https://{WG_IP_ADDRESS}:${ETCD_CLIENT_PORT}"
+                - name: initial-advertise-peer-urls
+                  value: "https://cluster-endpoint:${ETCD_PEER_PORT},https://{WG_IP_ADDRESS}:${ETCD_PEER_PORT}"
+
           ---
           apiVersion: kubelet.config.k8s.io/v1beta1
           kind: KubeletConfiguration

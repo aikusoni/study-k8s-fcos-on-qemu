@@ -15,6 +15,8 @@ export LOADBALANCER_CONF_DIR="$(pwd)/.loadbalancer"
 export HAPROXY_PATH="$LOADBALANCER_CONF_DIR/haproxy.cfg"
 export MAIN_ADDRESSES_FILE="$LOADBALANCER_CONF_DIR/main-addresses.txt"
 export CLUSTER_PORT=6443
+export ETCD_CLIENT_PORT=2379
+export ETCD_PEER_PORT=2380
 
 export PODMAN_MACHINE_NAME="podman-machine-default"
 

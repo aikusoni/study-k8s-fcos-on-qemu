@@ -1,4 +1,4 @@
-# ignition_first_master_envsubst.yaml
+# k8s_ignition_other_main
 variant: fcos
 version: 1.6.0
 
@@ -77,8 +77,6 @@ storage:
         inline: |
           apiVersion: kubeadm.k8s.io/v1beta4
           kind: JoinConfiguration
-          featureGates:
-            EtcdLearnerMode: true
           discovery:
             bootstrapToken:
               apiServerEndpoint: cluster-endpoint:${CLUSTER_PORT}
@@ -215,7 +213,7 @@ systemd:
         [Install]
         WantedBy=multi-user.target
 
-    # C) kubeadm join 서비스 (2 번째 이후 마스터 용)
+    # C) kubeadm join 서비스 (추가 컨트롤-플레인 노드용)
     - name: kubeadm-join.service
       enabled: true
       contents: |
@@ -231,7 +229,7 @@ systemd:
         Type=oneshot
         ExecStartPre=/usr/bin/bash -c '\
           until [ -S /var/run/containerd/containerd.sock ] && ctr version &>/dev/null; do sleep 1; done'
-        ExecStart=/usr/bin/env bash -c 'exec kubeadm join --config /etc/join-config.yaml'
+        ExecStart=/usr/bin/env bash -c 'exec kubeadm join --v=5 --config /etc/join-config.yaml'
         ExecStartPost=/bin/mkdir -p /home/core/.kube
         ExecStartPost=/bin/chown -R core:core /home/core/.kube
 
