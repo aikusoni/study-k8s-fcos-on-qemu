@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+source ./preconfigured.sh
+
 # VPN 이름
 vpn_name="wireguard-vpn"
 
@@ -15,8 +17,7 @@ if podman container inspect "${vpn_name}" &>/dev/null; then
     exit 0
   fi
 
-  echo "'${vpn_name}' container is 
-  . Starting..."
+  echo "'${vpn_name}' container exists. Starting..."
   podman start "${vpn_name}"
   exit 0
 fi
@@ -35,7 +36,7 @@ cidr="${ip_cidr##*/}"
 server_priv=$(wg genkey)
 server_pub=$(echo "$server_priv" | wg pubkey)
 
-echo "Server Private Key: $server_priv"
+echo "Server key pair generated."
 echo "Server Public Key: $server_pub"
 
 config_dir=~/podman-shared/wireguard-config/${vpn_name}

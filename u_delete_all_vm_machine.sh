@@ -3,6 +3,7 @@
 # 특정 프로세스 확인
 if pgrep -f "qemu-system-aarch64" > /dev/null; then
     echo "Turn off your vm before cleaning."
+    exit 1
 fi
 
 echo "Do you want to delete all vm?"

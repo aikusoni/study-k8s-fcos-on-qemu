@@ -66,10 +66,9 @@ ssh -i "$ssh_key" -o UserKnownHostsFile="$known_hosts_file" core@"$vm_ip" bash -
 set -e
 kubectl get sa cli-user -n kube-system >/dev/null 2>&1 || kubectl create sa cli-user -n kube-system
 kubectl get clusterrolebinding cli-user-binding >/dev/null 2>&1 || kubectl create clusterrolebinding cli-user-binding --clusterrole=cluster-admin --serviceaccount=kube-system:cli-user
-kubectl create token cli-user -n kube-system --duration=1h
 EOF
 KUBE_TOKEN=$(ssh -i "$ssh_key" -o UserKnownHostsFile="$known_hosts_file" core@"$vm_ip" 'kubectl create token cli-user -n kube-system --duration=1h')
-echo "▶ ServiceAccount token: $KUBE_TOKEN"
+echo "▶ ServiceAccount token issued for 1h"
 
 # 5) Fetch admin.conf via sudo and extract CA
 echo
