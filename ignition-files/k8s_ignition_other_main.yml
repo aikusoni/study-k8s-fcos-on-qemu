@@ -7,6 +7,8 @@ storage:
   directories:
     - path: /etc/kubernetes/pki
       mode: 0700
+    - path: /etc/containerd/certs.d/${LOCAL_REGISTRY_ENDPOINT}
+      mode: 0755
 
   files:
     - path: /etc/hostname
@@ -71,6 +73,17 @@ storage:
           kind: KubeletConfiguration
           volumePluginDir: /var/lib/kubelet/kubelet-plugins/volume/exec
 
+    - path: /etc/containerd/certs.d/${LOCAL_REGISTRY_ENDPOINT}/hosts.toml
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          server = "http://${LOCAL_REGISTRY_ENDPOINT}"
+
+          [host."http://${LOCAL_REGISTRY_ENDPOINT}"]
+            capabilities = ["pull", "resolve"]
+            skip_verify = true
+
     - path: /etc/join-config.yaml
       mode: 0644
       contents:
@@ -108,6 +121,8 @@ storage:
       contents:
         inline: |
           version = 2
+          [plugins."io.containerd.grpc.v1.cri".registry]
+            config_path = "/etc/containerd/certs.d"
           [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
             runtime_type = "io.containerd.runc.v2"
 

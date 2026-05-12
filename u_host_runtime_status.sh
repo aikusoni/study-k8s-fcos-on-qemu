@@ -36,7 +36,8 @@ if command -v podman >/dev/null 2>&1; then
   if ! podman info >/dev/null 2>&1; then
     echo "Podman API is unavailable. Start the Podman machine first or run outside a restricted sandbox."
   else
-    for container in wireguard-vpn haproxy; do
+    registry_name="${LOCAL_REGISTRY_NAME:-fcos-local-registry}"
+    for container in wireguard-vpn haproxy "$registry_name"; do
       if podman container exists "$container" >/dev/null 2>&1; then
         podman inspect "$container" \
           --format '{{.Name}} status={{.State.Status}} image={{.ImageName}} ports={{range $k,$v := .HostConfig.PortBindings}}{{$k}} {{end}}'
@@ -60,6 +61,24 @@ if command -v wg >/dev/null 2>&1; then
   fi
 else
   echo "wg is not installed."
+fi
+
+section "Local Registry"
+registry_host="${LOCAL_REGISTRY_HOST:-}"
+registry_host_file="./wireguard-client-config/wireguard-vpn/${PRECONFIGURED_HOST_WIREGUARD_CLIENT_NO}/wg_ip_address.txt"
+if [ -f "$registry_host_file" ]; then
+  registry_host="$(<"$registry_host_file")"
+fi
+registry_endpoint="${registry_host}:${LOCAL_REGISTRY_PORT:-5000}"
+echo "endpoint: http://${registry_endpoint}"
+if command -v curl >/dev/null 2>&1; then
+  if curl -fsS "http://${registry_endpoint}/v2/_catalog" 2>/dev/null; then
+    echo
+  else
+    echo "registry catalog unavailable"
+  fi
+else
+  echo "curl is not installed."
 fi
 
 section "Load Balancer Backends"
