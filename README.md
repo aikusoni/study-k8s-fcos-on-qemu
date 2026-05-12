@@ -103,3 +103,23 @@ Ignition 템플릿 용도:
 ./u_inspect_kube_cluster.sh get pods -A -o wide
 ./u_inspect_kube_cluster.sh describe node <node-name>
 ```
+
+## 상태 확인 유틸리티
+생성된 VM과 현재 실행 중인 QEMU 프로세스를 확인합니다.
+
+```bash
+./u_list_vm_machine.sh
+```
+
+호스트 쪽 런타임 상태를 한 번에 확인합니다.
+
+```bash
+./u_host_runtime_status.sh
+```
+
+특정 VM 내부의 systemd unit 상태를 확인합니다. Kubernetes `Service` 리소스가 아니라 VM OS 레벨의 `kubelet`, `containerd`, `wg-quick` 같은 systemd unit을 확인하는 용도입니다.
+
+```bash
+./u_inspect_vm_systemd.sh
+./u_inspect_vm_systemd.sh --logs
+```
