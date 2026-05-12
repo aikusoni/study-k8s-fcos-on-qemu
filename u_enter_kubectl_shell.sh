@@ -15,6 +15,10 @@ source ./preconfigured.sh  # defines CLUSTER_LOAD_BALANCER_END_POINT, API_SERVER
 # 2) SSH key selection
 ssh_dir="./.ssh"
 known_hosts_file="$ssh_dir/known_hosts"
+ssh_extra_options=()
+if ssh -G -T 127.0.0.1 -o WarnWeakCrypto=no-pq-kex >/dev/null 2>&1; then
+  ssh_extra_options=(-o WarnWeakCrypto=no-pq-kex)
+fi
 shopt -s nullglob
 mapfile -t priv_keys < <(
   find "$ssh_dir" -maxdepth 1 -type f ! -name "*.pub" ! -name "known_hosts" | sort
@@ -62,12 +66,12 @@ echo "▶ Master VM IP: $vm_ip"
 # 4) Generate or retrieve ServiceAccount token for kubectl
 echo
 printf "Ensuring cli-user ServiceAccount and binding...\n"
-ssh -i "$ssh_key" -o UserKnownHostsFile="$known_hosts_file" core@"$vm_ip" bash -<<'EOF'
+ssh -i "$ssh_key" -o UserKnownHostsFile="$known_hosts_file" "${ssh_extra_options[@]}" core@"$vm_ip" bash -<<'EOF'
 set -e
 kubectl get sa cli-user -n kube-system >/dev/null 2>&1 || kubectl create sa cli-user -n kube-system
 kubectl get clusterrolebinding cli-user-binding >/dev/null 2>&1 || kubectl create clusterrolebinding cli-user-binding --clusterrole=cluster-admin --serviceaccount=kube-system:cli-user
 EOF
-KUBE_TOKEN=$(ssh -i "$ssh_key" -o UserKnownHostsFile="$known_hosts_file" core@"$vm_ip" 'kubectl create token cli-user -n kube-system --duration=1h')
+KUBE_TOKEN=$(ssh -i "$ssh_key" -o UserKnownHostsFile="$known_hosts_file" "${ssh_extra_options[@]}" core@"$vm_ip" 'kubectl create token cli-user -n kube-system --duration=1h')
 echo "▶ ServiceAccount token issued for 1h"
 
 # 5) Fetch admin.conf via sudo and extract CA
@@ -75,8 +79,10 @@ echo
 printf "Copying admin.conf and extracting CA cert...\n"
 TMPDIR=$(mktemp -d)
 ssh -i "$ssh_key" -o UserKnownHostsFile="$known_hosts_file" \
+  "${ssh_extra_options[@]}" \
   core@"$vm_ip" "sudo cp /etc/kubernetes/admin.conf /home/core/admin.conf && sudo chown core:core /home/core/admin.conf"
 scp -i "$ssh_key" -o UserKnownHostsFile="$known_hosts_file" \
+  "${ssh_extra_options[@]}" \
   core@"$vm_ip":/home/core/admin.conf "$TMPDIR/admin.conf"
 grep 'certificate-authority-data:' "$TMPDIR/admin.conf" | awk '{print $2}' | base64 --decode > "$TMPDIR/ca.crt"
 echo "▶ CA cert at $TMPDIR/ca.crt"

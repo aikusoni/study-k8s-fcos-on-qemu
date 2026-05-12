@@ -19,6 +19,7 @@
 - QEMU (`qemu-img`, `qemu-system-aarch64`)
 - Butane
 - gettext (`envsubst`)
+- kubectl
 - OpenSSL
 - Python 3
 
@@ -87,4 +88,18 @@ Ignition 템플릿 용도:
 
 ```bash
 ./u_enter_kubectl_shell.sh
+```
+
+클러스터 상태를 호스트에서 한 번에 확인하려면 다음 스크립트를 실행합니다.
+
+```bash
+./u_inspect_kube_cluster.sh
+```
+
+특정 `kubectl` 명령만 실행할 수도 있습니다.
+
+```bash
+./u_inspect_kube_cluster.sh get nodes -o wide
+./u_inspect_kube_cluster.sh get pods -A -o wide
+./u_inspect_kube_cluster.sh describe node <node-name>
 ```

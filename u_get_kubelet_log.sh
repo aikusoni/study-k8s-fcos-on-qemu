@@ -8,6 +8,10 @@ set -euo pipefail
 source ./preconfigured.sh
 ssh_dir="./.ssh"
 known_hosts_file="$ssh_dir/known_hosts"
+ssh_extra_options=()
+if ssh -G -T 127.0.0.1 -o WarnWeakCrypto=no-pq-kex >/dev/null 2>&1; then
+  ssh_extra_options=(-o WarnWeakCrypto=no-pq-kex)
+fi
 
 # 1) SSH 키 목록 (known_hosts 제외)
 shopt -s nullglob
@@ -72,4 +76,5 @@ mkdir -p .logs
 ssh -i "$ssh_key" \
     -o UserKnownHostsFile="$known_hosts_file" \
     -o StrictHostKeyChecking=accept-new \
+    "${ssh_extra_options[@]}" \
     core@"$vm_ip" "sudo journalctl -u kubelet" > ".logs/${vm_ip}_kubelet.log"

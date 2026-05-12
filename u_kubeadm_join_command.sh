@@ -10,6 +10,10 @@ echo "kubeadm join 명령어 조회"
 source ./preconfigured.sh
 ssh_dir="./.ssh"
 known_hosts_file="$ssh_dir/known_hosts"
+ssh_extra_options=()
+if ssh -G -T 127.0.0.1 -o WarnWeakCrypto=no-pq-kex >/dev/null 2>&1; then
+  ssh_extra_options=(-o WarnWeakCrypto=no-pq-kex)
+fi
 
 # 1) SSH 키 목록 (known_hosts 제외)
 shopt -s nullglob
@@ -77,6 +81,7 @@ echo "▶ Connecting to VPN VM at $vm_ip"
 join_cmd=$(ssh -i "$ssh_key" \
     -o UserKnownHostsFile="$known_hosts_file" \
     -o StrictHostKeyChecking=accept-new \
+    "${ssh_extra_options[@]}" \
     core@"$vm_ip" \
     "kubeadm token create --print-join-command" \
 )
